@@ -10,14 +10,17 @@ def run_command(cmd):
     try: return subprocess.check_output(cmd, shell=True).decode().strip()
     except: return None
 
+print("🛰️ Rastreamento Nexos Ativo com GPS de Alta Prioridade...")
+
 def coletar_e_enviar():
-    print("📡 Coletando dados dos sensores...")
+    # Coleta de bateria
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
         try: battery = str(json.loads(out_bat).get("percentage", "N/A"))
         except: pass
         
+    # Coleta de espaço livre
     storage = "N/A"
     out_df = run_command("df -h /data/data/com.termux/files/home")
     if out_df:
@@ -28,8 +31,9 @@ def coletar_e_enviar():
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
 
+    # Coleta de localização ativa (força o Android a ler o satélite na hora)
     lat, lon = -16.6869, -49.2648
-    out_loc = run_command("termux-location -p network -r once")
+    out_loc = run_command("termux-location -p gps -r once")
     if out_loc:
         try:
             loc_data = json.loads(out_loc)
@@ -48,11 +52,11 @@ def coletar_e_enviar():
 
     try:
         response = requests.post(URL_SERVIDOR, json=payload, timeout=8)
-        if response.status_code == 200: print("✅ Sincronizado com o Painel Nuvem!")
-        else: print(f"⚠️ Resposta do Servidor: {response.status_code}")
+        if response.status_code == 200: 
+            print(f"✅ Sincronizado! GPS: {lat}, {lon} | Bat: {battery}%")
     except Exception as e:
-        print(f"❌ Erro de conexão: {e}")
+        print(f"❌ Falha ao enviar para o servidor: {e}")
 
 while True:
     coletar_e_enviar()
-    time.sleep(20)
+    time.sleep(10) # Envia os dados de 10 em 10 segundos cravados
