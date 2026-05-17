@@ -22,7 +22,7 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR GPS CALIBRADO // FLUXO SEGURO")
+print(f"🛰️  MOTOR GPS CALIBRADO // RAIZ PRINCIPAL")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*45 + "\n")
 
