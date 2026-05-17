@@ -29,9 +29,13 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .info-box { background: #070f15; border: 1px solid #1e293b; padding: 10px; border-radius: 6px; }
         .info-box span { font-size: 11px; color: #64748b; display: block; text-transform: uppercase; }
         .info-box strong { font-size: 16px; color: #f1f5f9; }
-        .map-container { width: 100%; height: 300px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; }
+        .map-container { width: 100%; height: 300px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
         .status-tag { background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
         .error-msg { color: #f87171; font-size: 12px; margin-top: 10px; }
+        
+        /* BOTÃO DO GOOGLE MAPS ESTILIZADO */
+        .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2); transition: background 0.3s; }
+        .btn-maps:hover { background: #16a34a; }
     </style>
 </head>
 <body>
@@ -63,11 +67,15 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     <div class="info-box"><span>Uptime</span><strong id="txt_uptime">{{ info_moto.uptime }}</strong></div>
                     <div class="info-box"><span>Sinal GPS</span><strong style="color: #38bdf8;">100%</strong></div>
                 </div>
+                
                 <div id="map_private" class="map-container"></div>
+                
+                <a id="lnk_maps" href="https://www.google.com/maps/search/?api=1&query={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
+                    🗺️ Abrir no Google Maps
+                </a>
             </div>
 
             <script>
-                // Inicializa o mapa fixo uma única vez para evitar tela preta
                 let lat = {{ info_moto.lat }};
                 let lon = {{ info_moto.lon }};
                 const map = L.map('map_private', { zoomControl: false }).setView([lat, lon], 16);
@@ -76,24 +84,24 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 }).addTo(map);
                 let marker = L.marker([lat, lon]).addTo(map);
                 
-                // Função AJAX que atualiza os dados em segundo plano sem dar F5 na página
                 setInterval(async () => {
                     try {
                         const response = await fetch('/api/status/{{ id_buscado }}');
                         if (response.ok) {
                             const data = await response.json();
-                            // Atualiza os textos na tela de forma limpa
                             document.getElementById('txt_bateria').innerText = data.battery + '%';
                             document.getElementById('txt_storage').innerText = data.storage;
                             document.getElementById('txt_uptime').innerText = data.uptime;
                             
-                            // Move o pino no mapa suavemente para a nova localização
                             const newPos = [parseFloat(data.lat), parseFloat(data.lon)];
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
+                            
+                            // ATUALIZAÇÃO DO LINK DO BOTÃO EM TEMPO REAL:
+                            document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lon}`;
                         }
-                    } catch (e) { console.log("Erro ao sincronizar dados dinâmicos"); }
-                }, 10000); // Atualiza mais rápido (a cada 10 segundos) sem pesar nada!
+                    } catch (e) { console.log("Erro de sincronização"); }
+                }, 10000);
             </script>
         {% endif %}
     </div>
@@ -106,17 +114,14 @@ def index():
     id_buscado = None
     info_moto = None
     erro = None
-    
     if request.method == 'POST':
         id_buscado = request.form.get('target_id', '').strip()
         if id_buscado in db_dispositivos:
             info_moto = db_dispositivos[id_buscado]
         else:
             erro = "❌ IDENTIFICADOR NÃO ENCONTRADO OU FORA DE ALCANCE."
-            
     return render_template_string(HTML_DASHBOARD_PRIVADO, id_buscado=id_buscado, info_moto=info_moto, erro=erro)
 
-# ENDPOINT API: Retorna apenas os dados puros em JSON para o JavaScript atualizar a tela
 @app.route('/api/status/<device_id>')
 def api_status(device_id):
     if device_id in db_dispositivos:
