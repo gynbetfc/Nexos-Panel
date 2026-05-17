@@ -97,7 +97,8 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
                             
-                            document.getElementById('lnk_maps').href = `https://www.google.com/maps?q=${lastValidLat},${lastValidLon}`;
+                            // SINTAXE CORRIGIDA DO JAVASCRIPT COM O SÍMBOLO DE $
+                            document.getElementById('lnk_maps').href = `https://www.google.com/maps?q=\${lastValidLat},\${lastValidLon}`;
                         }
                     } catch (e) {}
                 }, 5000);
