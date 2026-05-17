@@ -22,11 +22,11 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR NEXOS COM TIMEOUT ULTRA VELOZ")
+print(f"🛰️  MOTOR GPS PURA PRECISÃO // TIMEOUT FIXED")
 print(f"🔑  SEU MONITOR ID: {DEVICE_ID}")
 print("="*45 + "\n")
 
-# Guarda a última localização válida na memória do celular caso o satélite falhe
+# Histórico para manter o pino fixo na última coordenada real de satélite
 ultima_lat_valida = -16.6869
 ultima_lon_valida = -49.2648
 
@@ -49,23 +49,20 @@ while True:
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
 
-    # MUDANÇA CRUCIAL: Usamos o provedor 'network' primeiro por ser instantâneo (0 segundos de espera)
-    # E na sequência pedimos o GPS. Se o GPS demorar, o comando não trava o script.
     lat, lon = ultima_lat_valida, ultima_lon_valida
     
-    # Tenta ler a localização da rede/satélite de forma combinada rápida
-    out_loc = run_command("termux-location -p network -r once")
-    if not out_loc:
-        out_loc = run_command("termux-location -p gps -r once")
-        
+    # VOLTA PARA GPS PURO (-p gps) mas limita a espera do hardware em no máximo 3000 milissegundos (3 segundos)
+    out_loc = run_command("termux-location -p gps -request once -timeout 3000")
+    
     if out_loc:
         try:
             loc_data = json.loads(out_loc)
-            lat = loc_data.get("latitude", lat)
-            lon = loc_data.get("longitude", lon)
-            # Atualiza o histórico de segurança
-            ultima_lat_valida = lat
-            ultima_lon_valida = lon
+            # Garante que pegou coordenadas reais e não nulas
+            if loc_data.get("latitude") and loc_data.get("longitude"):
+                lat = loc_data.get("latitude")
+                lon = loc_data.get("longitude")
+                ultima_lat_valida = lat
+                ultima_lon_valida = lon
         except: pass
 
     payload = {
@@ -81,9 +78,9 @@ while True:
         response = requests.post(URL_SERVIDOR, json=payload, timeout=4)
         if response.status_code == 200:
             t_ciclo = int(time.time() - t_inicio)
-            print(f"✅ [SINAL SEGURO] Enviado em {t_ciclo}s! [{lat}, {lon}] | Bat: {battery}%")
+            print(f"🛰️ [SATÉLITE] Posição enviada em {t_ciclo}s! [{lat}, {lon}]")
     except Exception as e:
         print(f"❌ Aguardando rede: {e}")
 
-    # Ajusta o descanso dinamicamente para manter o ciclo sempre cravado perto de 10 segundos
-    time.sleep(6)
+    # Ajusta o tempo de espera fixo para manter o loop constante
+    time.sleep(7)
