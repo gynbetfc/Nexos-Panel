@@ -58,27 +58,42 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     <span class="status-tag">ONLINE</span>
                 </div>
                 <div class="info-grid">
-                    <div class="info-box"><span>Bateria</span><strong style="color: #22c55e;">{{ info_moto.battery }}%</strong></div>
-                    <div class="info-box"><span>Espaço Livre</span><strong>{{ info_moto.storage }}</strong></div>
-                    <div class="info-box"><span>Uptime</span><strong>{{ info_moto.uptime }}</strong></div>
+                    <div class="info-box"><span>Bateria</span><strong id="txt_bateria" style="color: #22c55e;">{{ info_moto.battery }}%</strong></div>
+                    <div class="info-box"><span>Espaço Livre</span><strong id="txt_storage">{{ info_moto.storage }}</strong></div>
+                    <div class="info-box"><span>Uptime</span><strong id="txt_uptime">{{ info_moto.uptime }}</strong></div>
                     <div class="info-box"><span>Sinal GPS</span><strong style="color: #38bdf8;">100%</strong></div>
                 </div>
                 <div id="map_private" class="map-container"></div>
             </div>
 
             <script>
-                const lat = {{ info_moto.lat }};
-                const lon = {{ info_moto.lon }};
+                // Inicializa o mapa fixo uma única vez para evitar tela preta
+                let lat = {{ info_moto.lat }};
+                let lon = {{ info_moto.lon }};
                 const map = L.map('map_private', { zoomControl: false }).setView([lat, lon], 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                     attribution: 'Nexos Private'
                 }).addTo(map);
-                L.marker([lat, lon]).addTo(map);
+                let marker = L.marker([lat, lon]).addTo(map);
                 
-                # CORREÇÃO DA ATUALIZAÇÃO: Agora o JavaScript força o envio sem perder o texto da caixinha
-                setTimeout(() => { 
-                    document.getElementById('searchForm').submit(); 
-                }, 15000);
+                // Função AJAX que atualiza os dados em segundo plano sem dar F5 na página
+                setInterval(async () => {
+                    try {
+                        const response = await fetch('/api/status/{{ id_buscado }}');
+                        if (response.ok) {
+                            const data = await response.json();
+                            // Atualiza os textos na tela de forma limpa
+                            document.getElementById('txt_bateria').innerText = data.battery + '%';
+                            document.getElementById('txt_storage').innerText = data.storage;
+                            document.getElementById('txt_uptime').innerText = data.uptime;
+                            
+                            // Move o pino no mapa suavemente para a nova localização
+                            const newPos = [parseFloat(data.lat), parseFloat(data.lon)];
+                            marker.setLatLng(newPos);
+                            map.panTo(newPos);
+                        }
+                    } catch (e) { console.log("Erro ao sincronizar dados dinâmicos"); }
+                }, 10000); // Atualiza mais rápido (a cada 10 segundos) sem pesar nada!
             </script>
         {% endif %}
     </div>
@@ -100,6 +115,13 @@ def index():
             erro = "❌ IDENTIFICADOR NÃO ENCONTRADO OU FORA DE ALCANCE."
             
     return render_template_string(HTML_DASHBOARD_PRIVADO, id_buscado=id_buscado, info_moto=info_moto, erro=erro)
+
+# ENDPOINT API: Retorna apenas os dados puros em JSON para o JavaScript atualizar a tela
+@app.route('/api/status/<device_id>')
+def api_status(device_id):
+    if device_id in db_dispositivos:
+        return jsonify(db_dispositivos[device_id]), 200
+    return jsonify({"error": "Not found"}), 404
 
 @app.route('/update', methods=['POST'])
 def update():
