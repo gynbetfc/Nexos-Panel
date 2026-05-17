@@ -32,10 +32,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .map-container { width: 100%; height: 300px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
         .status-tag { background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
         .error-msg { color: #f87171; font-size: 12px; margin-top: 10px; }
-        
-        /* BOTÃO DO GOOGLE MAPS ESTILIZADO */
-        .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.2); transition: background 0.3s; }
-        .btn-maps:hover { background: #16a34a; }
+        .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; }
     </style>
 </head>
 <body>
@@ -65,7 +62,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     <div class="info-box"><span>Bateria</span><strong id="txt_bateria" style="color: #22c55e;">{{ info_moto.battery }}%</strong></div>
                     <div class="info-box"><span>Espaço Livre</span><strong id="txt_storage">{{ info_moto.storage }}</strong></div>
                     <div class="info-box"><span>Uptime</span><strong id="txt_uptime">{{ info_moto.uptime }}</strong></div>
-                    <div class="info-box"><span>Sinal GPS</span><strong style="color: #38bdf8;">100%</strong></div>
+                    <div class="info-box"><span>Sinal GPS</span><strong style="color: #38bdf8;">100% DISPOSITIVO</strong></div>
                 </div>
                 
                 <div id="map_private" class="map-container"></div>
@@ -78,12 +75,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
             <script>
                 let lat = {{ info_moto.lat }};
                 let lon = {{ info_moto.lon }};
+                
                 const map = L.map('map_private', { zoomControl: false }).setView([lat, lon], 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                     attribution: 'Nexos Private'
                 }).addTo(map);
                 let marker = L.marker([lat, lon]).addTo(map);
-                
+
+                // Busca as coordenadas reais vindas puramente do Termux a cada 5 segundos
                 setInterval(async () => {
                     try {
                         const response = await fetch('/api/status/{{ id_buscado }}');
@@ -96,12 +95,10 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             const newPos = [parseFloat(data.lat), parseFloat(data.lon)];
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
-                            
-                            // ATUALIZAÇÃO DO LINK DO BOTÃO EM TEMPO REAL:
                             document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lon}`;
                         }
                     } catch (e) { console.log("Erro de sincronização"); }
-                }, 10000);
+                }, 5000);
             </script>
         {% endif %}
     </div>
@@ -119,7 +116,7 @@ def index():
         if id_buscado in db_dispositivos:
             info_moto = db_dispositivos[id_buscado]
         else:
-            erro = "❌ IDENTIFICADOR NÃO ENCONTRADO OU FORA DE ALCANCE."
+            erro = "❌ IDENTIFICADOR NÃO ENCONTRADO."
     return render_template_string(HTML_DASHBOARD_PRIVADO, id_buscado=id_buscado, info_moto=info_moto, erro=erro)
 
 @app.route('/api/status/<device_id>')
@@ -132,18 +129,18 @@ def api_status(device_id):
 def update():
     global db_dispositivos
     data = request.json
-    if not data or 'device_id' not in data:
-        return jsonify({"status": "error", "message": "Missing device_id"}), 400
-    
+    if not data or 'device_id' not in data: return jsonify({"status": "error"}), 400
     device_id = data['device_id']
-    db_dispositivos[device_id] = {
-        "battery": data.get("battery", "N/A"),
-        "storage": data.get("storage", "N/A"),
-        "uptime": data.get("uptime", "Ativo"),
-        "lat": float(data.get("lat", -16.6869)),
-        "lon": float(data.get("lon", -49.2648))
-    }
-    return jsonify({"status": "success", "message": "Data synced"}), 200
+    
+    if device_id not in db_dispositivos:
+        db_dispositivos[device_id] = {}
+        
+    db_dispositivos[device_id]["battery"] = data.get("battery", "N/A")
+    db_dispositivos[device_id]["storage"] = data.get("storage", "N/A")
+    db_dispositivos[device_id]["uptime"] = data.get("uptime", "Ativo")
+    db_dispositivos[device_id]["lat"] = float(data.get("lat", -16.6869))
+    db_dispositivos[device_id]["lon"] = float(data.get("lon", -49.2648))
+    return jsonify({"status": "success"}), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
