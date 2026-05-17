@@ -24,11 +24,16 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🤖 ECOSSISTEMA NEXOS COM COMANDO REMOTO ATIVO!")
-print(f"🔑 TARGET ID DO SEU APARELHO: {DEVICE_ID}")
+print(f"🤖  SISTEMA ASSÍNCRONO NEXOS CORE ATIVADO!")
+print(f"🔑  ID EXCLUSIVO DO APARELHO: {DEVICE_ID}")
 print("="*45 + "\n")
 
-def executar_ciclo():
+# Variáveis de controle do cronômetro interno
+gravando_agora = False
+tempo_inicio_gravacao = 0
+
+while True:
+    # 1. COLETA DE DADOS CRUCIAL (Roda sempre, sem travar)
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
@@ -45,7 +50,7 @@ def executar_ciclo():
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
 
-    # GPS Estável Tradicional (Garante o pino cravado de forma leve)
+    # Captura o GPS de forma ultra leve
     lat, lon = -16.6869, -49.2648
     out_loc = run_command("termux-location -p gps -r once")
     if out_loc:
@@ -55,6 +60,7 @@ def executar_ciclo():
             lon = loc_data.get("longitude", lon)
         except: pass
 
+    # Prepara o pacote básico de transmissão
     payload = {
         "device_id": DEVICE_ID,
         "battery": battery,
@@ -62,38 +68,47 @@ def executar_ciclo():
         "uptime": "Ativo",
         "lat": lat,
         "lon": lon,
-        "audio_b64": "" # Envia em branco no fluxo normal
+        "audio_b64": ""
     }
 
+    # 2. GERENCIAMENTO DE ÁUDIO NÃO-BLOQUEANTE
+    tempo_atual = time.time()
+    
+    if gravando_agora:
+        # Verifica se já se passaram os 30 segundos desde o início da gravação
+        if tempo_atual - tempo_inicio_gravacao >= 30:
+            print("⏱️ [CRONÔMETRO] 30 segundos concluídos. Finalizando áudio...")
+            run_command("termux-microphone-record -q")
+            gravando_agora = False
+            
+            # Codifica o arquivo que foi gravado em background
+            if os.path.exists(ARQUIVO_AUDIO) and os.path.getsize(ARQUIVO_AUDIO) > 500:
+                with open(ARQUIVO_AUDIO, "rb") as f:
+                    payload["audio_b64"] = base64.b64encode(f.read()).decode('utf-8')
+                print("✅ Enviando bloco de áudio completo para a nuvem!")
+        else:
+            print(f"🎙️ Gravando em background... Faltam {int(30 - (tempo_atual - tempo_inicio_gravacao))}s")
+
+    # 3. TRANSMISSÃO CONSTANTE (Mantém o GPS vivo no site)
     try:
-        response = requests.post(URL_SERVIDOR, json=payload, timeout=8)
+        response = requests.post(URL_SERVIDOR, json=payload, timeout=5)
         if response.status_code == 200:
             print(f"📡 Sinal GPS OK! [{lat}, {lon}] | Bateria: {battery}%")
             
-            # CHECA SE O SITE MANDOU GRAVAR ÁUDIO
+            # CHECA SE CHEGOU UMA NOVA ORDEM DE GRAVAÇÃO
             dados_resposta = response.json()
-            if dados_resposta.get("comando_gravacao") == True:
-                print("🎙️ [ORDEM RECEBIDA] Gravando 30 segundos de áudio ambiental...")
+            if dados_resposta.get("comando_gravacao") == True and not gravando_agora:
+                print("🎙️ [ORDEM RECEBIDA] Disparando gravação em background por 30s...")
                 run_command("termux-microphone-record -q")
                 if os.path.exists(ARQUIVO_AUDIO): os.remove(ARQUIVO_AUDIO)
                 
-                # Inicia a gravação e faz o Python esperar os 30s solicitados
+                # Inicia a gravação em segundo plano sem usar sleep
                 subprocess.Popen(f"termux-microphone-record -f {ARQUIVO_AUDIO}", shell=True)
-                time.sleep(30)
-                run_command("termux-microphone-record -q")
+                gravando_agora = True
+                tempo_inicio_gravacao = time.time()
                 
-                # Transforma o áudio .wav bruto e joga no servidor imediato
-                if os.path.exists(ARQUIVO_AUDIO) and os.path.getsize(ARQUIVO_AUDIO) > 500:
-                    with open(ARQUIVO_AUDIO, "rb") as f:
-                        payload["audio_b64"] = base64.b64encode(f.read()).decode('utf-8')
-                    
-                    requests.post(URL_SERVIDOR, json=payload, timeout=15)
-                    print("✅ Áudio de 30s transmitido com sucesso pro site!")
-                    
     except Exception as e:
-        print(f"❌ Erro de rede: {e}")
+        print(f"❌ Erro de comunicação: {e}")
 
-# Loop limpo e leve a cada 10 segundos
-while True:
-    executar_ciclo()
-    time.sleep(10)
+    # O ciclo agora roda rápido (a cada 5 segundos) garantindo atualizações instantâneas no mapa
+    time.sleep(5)
