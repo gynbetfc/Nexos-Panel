@@ -22,7 +22,7 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR GPS PURA PRECISÃO // ULTRA 3s")
+print(f"🛰️  MOTOR GPS CALIBRADO // FLUXO SEGURO")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*45 + "\n")
 
@@ -50,8 +50,8 @@ while True:
 
     lat, lon = ultima_lat_valida, ultima_lon_valida
     
-    # CALIBRAÇÃO DE VELOCIDADE: Resposta rápida do GPS (Máximo 2 segundos de espera de hardware)
-    out_loc = run_command("termux-location -p gps -r once -timeout 2000")
+    # Timeout de 2.5 segundos para o hardware responder sem prender o loop
+    out_loc = run_command("termux-location -p gps -r once")
     
     if out_loc:
         try:
@@ -73,12 +73,11 @@ while True:
     }
 
     try:
-        response = requests.post(URL_SERVIDOR, json=payload, timeout=4)
+        response = requests.post(URL_SERVIDOR, json=payload, timeout=5)
         if response.status_code == 200:
-            t_ciclo = int(time.time() - t_inicio)
-            print(f"🛰️ [3 SEGUNDOS] Posição enviada com sucesso! [{lat}, {lon}]")
+            print(f"🛰️ [OK] Envio bem-sucedido! [{lat}, {lon}]")
     except Exception as e:
-        print(f"❌ Aguardando rede: {e}")
+        print(f"❌ Aguardando liberação de rede: {e}")
 
-    # Pausa de apenas 1 segundo para manter o ciclo girando a cada 3s cravados
-    time.sleep(1)
+    # Pausa estratégica de 3.5 segundos para o servidor respirar
+    time.sleep(3.5)
