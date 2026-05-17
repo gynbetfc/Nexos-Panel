@@ -2,45 +2,36 @@ import time
 import subprocess
 import json
 import requests
-import sys
+import os
+import uuid
 
 URL_SERVIDOR = "https://nexos-t0to.onrender.com/update"
+ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
 
 def run_command(cmd):
     try: return subprocess.check_output(cmd, shell=True).decode().strip()
     except: return ""
 
-def extrair_id_unico():
-    # 1. TENTATIVA: Pegar o número do chip/telefone (via API do Termux se tiver permissão)
-    out_telephony = run_command("termux-telephony-deviceinfo")
-    if out_telephony:
-        try:
-            tele_data = json.loads(out_telephony)
-            # Tenta buscar o número da linha ou o ID do assinante do chip
-            num_sim = tele_data.get("phone_number") or tele_data.get("subscriber_id")
-            if num_sim and num_sim != "unknown" and len(num_sim) > 3:
-                return f"NX-CHIP-{num_sim[-8:].upper()}" # Usa os últimos 8 dígitos do chip
-        except: pass
+def obter_ou_criar_id_unico():
+    # Se já existir o ID salvo no celular, apenas lê ele para manter sempre o mesmo
+    if os.path.exists(ARQUIVO_ID):
+        with open(ARQUIVO_ID, "r") as f:
+            return f.read().strip()
+    
+    # Se não existir (primeira vez rodando), gera um ID aleatório ultra seguro de 6 dígitos
+    novo_id = f"NX-{str(uuid.uuid4())[:6].upper()}"
+    
+    # Salva no arquivo para as próximas vezes
+    with open(ARQUIVO_ID, "w") as f:
+        f.write(novo_id)
+    return novo_id
 
-    # 2. TENTATIVA: Se o chip falhar, pega o Serial de Hardware do Android
-    serial = run_command("getprop ro.serialno")
-    if serial and serial != "unknown" and len(serial) > 3:
-        return f"NX-SERIAL-{serial.upper()}"
-
-    # 3. TENTATIVA: Se o serial falhar, pega o Secure Android ID (Único por aparelho)
-    android_id = run_command("settings get secure android_id")
-    if android_id and android_id != "unknown" and len(android_id) > 3:
-        return f"NX-ID-{android_id[:10].upper()}"
-
-    # CADASTRADO DE EMERGÊNCIA (Se tudo der negado no Android)
-    return "NX-DISP-DESCONHECIDO"
-
-# GERA E MOSTRA O ID LOGO NO ARRANQUE DO SCRIPT
-DEVICE_ID = extrair_id_unico()
+# ATRIBUI O ID ALEATÓRIO SALVO
+DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
 print(f"🤖  SISTEMA NEXOS INICIADO COM SUCESSO!")
-print(f"🔑  SEU TARGET ID ÚNICO É: {DEVICE_ID}")
+print(f"🔑  SEU TARGET ID ÚNICO E EXCLUSIVO É: {DEVICE_ID}")
 print("👉  COPIE ESTE ID E COLOQUE NO SITE PARA RASTREAR")
 print("="*45 + "\n")
 
