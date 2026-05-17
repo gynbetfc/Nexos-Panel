@@ -9,7 +9,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXOS CORE // PROD PANEL</title>
+    <title>NEXOS CORE // PRODUCTION PANEL</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -62,7 +62,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 
                 <div id="map_private" class="map-container"></div>
                 
-                <a id="lnk_maps" href="http://googleusercontent.com/maps.google.com/6{{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
+                <a id="lnk_maps" href="https://www.google.com/maps/search/?api=1&query={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
                     🗺️ Abrir no Google Maps
                 </a>
             </div>
@@ -84,7 +84,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             let nextLat = parseFloat(data.lat);
                             let nextLon = parseFloat(data.lon);
                             
-                            // Aceita qualquer coordenada que mude de fato da posição de erro inicial
                             if (!nextLat || !nextLon) return;
                             
                             lastValidLat = nextLat;
@@ -97,7 +96,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             const newPos = [lastValidLat, lastValidLon];
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
-                            document.getElementById('lnk_maps').href = `http://googleusercontent.com/maps.google.com/7{lastValidLat},${lastValidLon}`;
+                            
+                            // LINK DO MAPS DA API DO GOOGLE TOTALMENTE CORRIGIDO VIA JAVASCRIPT!
+                            document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${lastValidLat},${lastValidLon}`;
                         }
                     } catch (e) {}
                 }, 4000);
