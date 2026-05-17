@@ -1,3 +1,4 @@
+import os
 from flask import Flask, render_template_string, request, jsonify
 
 app = Flask(__name__)
@@ -73,7 +74,6 @@ HTML_DASHBOARD = """<!DOCTYPE html>
     </div>
 
     <script>
-        // Refresh automático a cada 15 segundos para atualizar a posição das motos na tela
         setTimeout(() => { window.location.reload(); }, 15000);
     </script>
 </body>
@@ -102,4 +102,6 @@ def update():
     return jsonify({"status": "success", "message": "Data synced"}), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    # PEGA A PORTA QUE O RENDER MANDAR DINAMICAMENTE, SE NÃO ACHA, USA A 5000
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
