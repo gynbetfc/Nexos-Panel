@@ -22,11 +22,10 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR GPS PURA PRECISÃO // TIMEOUT FIXED")
+print(f"🛰️  MOTOR GPS PURA PRECISÃO // SINTAXE FIX")
 print(f"🔑  SEU MONITOR ID: {DEVICE_ID}")
 print("="*45 + "\n")
 
-# Histórico para manter o pino fixo na última coordenada real de satélite
 ultima_lat_valida = -16.6869
 ultima_lon_valida = -49.2648
 
@@ -51,13 +50,12 @@ while True:
 
     lat, lon = ultima_lat_valida, ultima_lon_valida
     
-    # VOLTA PARA GPS PURO (-p gps) mas limita a espera do hardware em no máximo 3000 milissegundos (3 segundos)
-    out_loc = run_command("termux-location -p gps -request once -timeout 3000")
+    # CORREÇÃO DA SINTAXE AQUI: Mudado de -request para -r para o Termux aceitar!
+    out_loc = run_command("termux-location -p gps -r once")
     
     if out_loc:
         try:
             loc_data = json.loads(out_loc)
-            # Garante que pegou coordenadas reais e não nulas
             if loc_data.get("latitude") and loc_data.get("longitude"):
                 lat = loc_data.get("latitude")
                 lon = loc_data.get("longitude")
@@ -82,5 +80,4 @@ while True:
     except Exception as e:
         print(f"❌ Aguardando rede: {e}")
 
-    # Ajusta o tempo de espera fixo para manter o loop constante
-    time.sleep(7)
+    time.sleep(8)
