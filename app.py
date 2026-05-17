@@ -97,11 +97,11 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
                             
-                            // Link oficial do Google Maps totalmente corrigido usando Template String correta do JS
+                            // Link oficial com sintaxe universal do Google Maps sem risco de falhas
                             document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${lastValidLat},${lastValidLon}`;
                         }
                     } catch (e) {}
-                }, 3000); // Consulta o servidor a cada 3 segundos cravados!
+                }, 5000);
             </script>
         {% endif %}
     </div>
