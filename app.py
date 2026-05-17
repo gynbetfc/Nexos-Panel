@@ -42,8 +42,8 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 
         <div class="search-box">
             <p>DIGITE O SEU TARGET ID PARA ACESSAR O MONITORAMENTO</p>
-            <form method="POST">
-                <input type="text" name="target_id" placeholder="EX: NX-MOTO-ZETA" value="{{ id_buscado or '' }}" required><br>
+            <form id="searchForm" method="POST">
+                <input type="text" id="target_id" name="target_id" placeholder="EX: NX-MOTO-ZETA" value="{{ id_buscado if id_buscado else '' }}" required><br>
                 <button type="submit">Conectar Sinal</button>
             </form>
             {% if erro %}
@@ -75,8 +75,10 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 }).addTo(map);
                 L.marker([lat, lon]).addTo(map);
                 
-                // Recarrega mantendo o ID na tela para manter o fluxo ao vivo
-                setTimeout(() => { document.forms[0].submit(); }, 15000);
+                # CORREÇÃO DA ATUALIZAÇÃO: Agora o JavaScript força o envio sem perder o texto da caixinha
+                setTimeout(() => { 
+                    document.getElementById('searchForm').submit(); 
+                }, 15000);
             </script>
         {% endif %}
     </div>
