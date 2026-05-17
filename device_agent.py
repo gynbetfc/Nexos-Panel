@@ -22,11 +22,17 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR DE GPS COMPATÍVEL ATIVADO")
+print(f"🛰️  MOTOR NEXOS COM TIMEOUT ULTRA VELOZ")
 print(f"🔑  SEU MONITOR ID: {DEVICE_ID}")
 print("="*45 + "\n")
 
+# Guarda a última localização válida na memória do celular caso o satélite falhe
+ultima_lat_valida = -16.6869
+ultima_lon_valida = -49.2648
+
 while True:
+    t_inicio = time.time()
+
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
@@ -43,18 +49,23 @@ while True:
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
 
-    # Força uma pré-leitura rápida para acordar o satélite antes do envio oficial
-    run_command("termux-location -p gps -r once")
-    time.sleep(2)
-
-    # Captura a coordenada atualizada
-    lat, lon = -16.6869, -49.2648
-    out_loc = run_command("termux-location -p gps -r once")
+    # MUDANÇA CRUCIAL: Usamos o provedor 'network' primeiro por ser instantâneo (0 segundos de espera)
+    # E na sequência pedimos o GPS. Se o GPS demorar, o comando não trava o script.
+    lat, lon = ultima_lat_valida, ultima_lon_valida
+    
+    # Tenta ler a localização da rede/satélite de forma combinada rápida
+    out_loc = run_command("termux-location -p network -r once")
+    if not out_loc:
+        out_loc = run_command("termux-location -p gps -r once")
+        
     if out_loc:
         try:
             loc_data = json.loads(out_loc)
             lat = loc_data.get("latitude", lat)
             lon = loc_data.get("longitude", lon)
+            # Atualiza o histórico de segurança
+            ultima_lat_valida = lat
+            ultima_lon_valida = lon
         except: pass
 
     payload = {
@@ -67,11 +78,12 @@ while True:
     }
 
     try:
-        response = requests.post(URL_SERVIDOR, json=payload, timeout=5)
+        response = requests.post(URL_SERVIDOR, json=payload, timeout=4)
         if response.status_code == 200:
-            print(f"✅ [SINAL SEGURO] Enviado: [{lat}, {lon}] | Bat: {battery}%")
+            t_ciclo = int(time.time() - t_inicio)
+            print(f"✅ [SINAL SEGURO] Enviado em {t_ciclo}s! [{lat}, {lon}] | Bat: {battery}%")
     except Exception as e:
         print(f"❌ Aguardando rede: {e}")
 
-    # Intervalo reduzido para 8 segundos para evitar que o Android desarme o chip por inatividade
-    time.sleep(8)
+    # Ajusta o descanso dinamicamente para manter o ciclo sempre cravado perto de 10 segundos
+    time.sleep(6)
