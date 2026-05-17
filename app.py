@@ -32,8 +32,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .status-tag { background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
         .error-msg { color: #f87171; font-size: 12px; margin-top: 10px; }
         .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; margin-bottom: 15px; }
-        
-        /* CONTAINER DE ÁUDIO PROFISSIONAL */
         .audio-box { background: #070f15; border: 1px solid #1e293b; padding: 15px; border-radius: 8px; text-align: center; }
         .audio-box span { font-size: 11px; color: #38bdf8; display: block; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; }
         audio { width: 100%; outline: none; filter: invert(0.9) hue-rotate(180deg); }
@@ -77,14 +75,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 
                 <div class="audio-box">
                     <span>🎙️ ESCUTA AMBIENTAL EM TEMPO REAL</span>
-                    <audio id="audio_player" controls src="{{ info_moto.audio_url if info_moto.audio_url else '' }}"></audio>
+                    <audio id="audio_player" controls></audio>
                 </div>
             </div>
 
             <script>
                 let lat = {{ info_moto.lat }};
                 let lon = {{ info_moto.lon }};
-                let currentAudio = "";
+                let lastAudioB64 = "";
                 
                 const map = L.map('map_private', { zoomControl: false }).setView([lat, lon], 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
@@ -104,16 +102,16 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             map.panTo(newPos);
                             document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lon}`;
                             
-                            // Se chegar um áudio novo e diferente, atualiza o player e toca automático
-                            if (data.audio_b64 && data.audio_b64 !== currentAudio) {
-                                currentAudio = data.audio_b64;
+                            // Toca o formato WAV nativo de forma imediata e fluida
+                            if (data.audio_b64 && data.audio_b64 !== lastAudioB64) {
+                                lastAudioB64 = data.audio_b64;
                                 const player = document.getElementById('audio_player');
-                                player.src = "data:audio/mp3;base64," + data.audio_b64;
-                                player.play().catch(e => console.log("Aguardando clique para tocar"));
+                                player.src = "data:audio/wav;base64," + data.audio_b64;
+                                player.play().catch(e => console.log("Aguardando interacao do usuario"));
                             }
                         }
                     } catch (e) { console.log("Erro de sincronização"); }
-                }, 5000);
+                }, 4000);
             </script>
         {% endif %}
     </div>
