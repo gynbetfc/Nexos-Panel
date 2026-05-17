@@ -9,7 +9,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXOS CORE // PRODUCTION PANEL</title>
+    <title>NEXOS CORE // FIXED PANEL</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -62,35 +62,50 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 
                 <div id="map_private" class="map-container"></div>
                 
-                <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
+                <a id="lnk_maps" href="https://maps.google.com/?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
                     🗺️ Abrir no Google Maps
                 </a>
             </div>
 
             <script>
-                let lat = {{ info_moto.lat }};
-                let lon = {{ info_moto.lon }};
+                // Mantém as últimas coordenadas válidas na memória do navegador do cliente
+                let lastValidLat = {{ info_moto.lat }};
+                let lastValidLon = {{ info_moto.lon }};
                 
-                const map = L.map('map_private', { zoomControl: false }).setView([lat, lon], 16);
+                const map = L.map('map_private', { zoomControl: false }).setView([lastValidLat, lastValidLon], 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
-                let marker = L.marker([lat, lon]).addTo(map);
+                let marker = L.marker([lastValidLat, lastValidLon]).addTo(map);
 
                 setInterval(async () => {
                     try {
                         const response = await fetch('/api/status/{{ id_buscado }}');
                         if (response.ok) {
                             const data = await response.json();
+                            
+                            let nextLat = parseFloat(data.lat);
+                            let nextLon = parseFloat(data.lon);
+                            
+                            // SE A COORDENADA VIER ZERADA, DO CENTRO EXATO OU INVÁLIDA, IGNORA E MANTÉM A ÚLTIMA
+                            if (!nextLat || !nextLon || (nextLat === -16.6869 && nextLon === -49.2648)) {
+                                console.log("Sinal flutuou. Mantendo pino travado na última posição real.");
+                                return; 
+                            }
+                            
+                            // Atualiza as variáveis com a nova posição real confirmada
+                            lastValidLat = nextLat;
+                            lastValidLon = nextLon;
+                            
                             document.getElementById('txt_bateria').innerText = data.battery + '%';
                             document.getElementById('txt_storage').innerText = data.storage;
                             document.getElementById('txt_uptime').innerText = data.uptime;
                             
-                            const newPos = [parseFloat(data.lat), parseFloat(data.lon)];
+                            const newPos = [lastValidLat, lastValidLon];
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
-                            document.getElementById('lnk_maps').href = `https://www.google.com/maps?q=${data.lat},${data.lon}`;
+                            document.getElementById('lnk_maps').href = `https://maps.google.com/?q=${lastValidLat},${lastValidLon}`;
                         }
                     } catch (e) {}
-                }, 5000);
+                }, 4000); // Consulta o servidor de 4 em 4 segundos de forma ultra rápida
             </script>
         {% endif %}
     </div>
