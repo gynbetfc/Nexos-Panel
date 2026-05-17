@@ -62,7 +62,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 
                 <div id="map_private" class="map-container"></div>
                 
-                <a id="lnk_maps" href="https://www.google.com/maps/search/?api=1&query={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
+                <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
                     🗺️ Abrir no Google Maps
                 </a>
             </div>
@@ -97,8 +97,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
                             
-                            // LINK COM SINTAXE DE STRING DO JAVASCRIPT TOTALMENTE AJUSTADA E TESTADA!
-                            document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${lastValidLat},${lastValidLon}`;
+                            document.getElementById('lnk_maps').href = `https://www.google.com/maps?q=${lastValidLat},${lastValidLon}`;
                         }
                     } catch (e) {}
                 }, 5000);
@@ -131,7 +130,7 @@ def api_status(device_id):
 @app.route('/update', methods=['POST'])
 def update():
     global db_dispositivos
-    data = request.json
+    data = request.get_json(force=True, silent=True)
     if not data or 'device_id' not in data: return jsonify({"status": "error"}), 400
     device_id = data['device_id']
     
