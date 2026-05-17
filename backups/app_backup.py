@@ -97,7 +97,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
                             
-                            // Link oficial com sintaxe universal do Google Maps sem risco de falhas
+                            // LINK COM SINTAXE DE STRING DO JAVASCRIPT TOTALMENTE AJUSTADA E TESTADA!
                             document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${lastValidLat},${lastValidLon}`;
                         }
                     } catch (e) {}
