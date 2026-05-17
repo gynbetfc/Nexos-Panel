@@ -50,7 +50,6 @@ while True:
 
     lat, lon = ultima_lat_valida, ultima_lon_valida
     
-    # Timeout de 2.5 segundos para o hardware responder sem prender o loop
     out_loc = run_command("termux-location -p gps -r once")
     
     if out_loc:
@@ -79,5 +78,5 @@ while True:
     except Exception as e:
         print(f"❌ Aguardando liberação de rede: {e}")
 
-    # Pausa estratégica de 3.5 segundos para o servidor respirar
-    time.sleep(3.5)
+    # Intervalo calibrado para 4.5 segundos (Evita o ban de IP da Render grátis)
+    time.sleep(4.5)
