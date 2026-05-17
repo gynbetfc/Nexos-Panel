@@ -22,15 +22,9 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR DE GPS NEXOS CALIBRADO // FIXO")
-print(f"🔑  SEU MONITOR ID CONTINUA: {DEVICE_ID}")
+print(f"🛰️  MOTOR DE GPS COMPATÍVEL ATIVADO")
+print(f"🔑  SEU MONITOR ID: {DEVICE_ID}")
 print("="*45 + "\n")
-
-# PASSO MESTRE: Liga a escuta contínua do chip de satélite em segundo plano.
-# O Android vai manter o canal do GPS aquecido e ativo o tempo todo!
-print("📡 Sintonizando satélites em background...")
-subprocess.Popen("termux-location -p gps -r listen", shell=True)
-time.sleep(3) # Pequena pausa apenas no início para o hardware sincronizar
 
 while True:
     battery = "N/A"
@@ -49,10 +43,13 @@ while True:
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
 
-    # Puxa instantaneamente a última coordenada real e aquecida do cache de hardware
-    # Sem forçar o Android a reiniciar o chip a cada ciclo
+    # Força uma pré-leitura rápida para acordar o satélite antes do envio oficial
+    run_command("termux-location -p gps -r once")
+    time.sleep(2)
+
+    # Captura a coordenada atualizada
     lat, lon = -16.6869, -49.2648
-    out_loc = run_command("termux-location -p gps -r last")
+    out_loc = run_command("termux-location -p gps -r once")
     if out_loc:
         try:
             loc_data = json.loads(out_loc)
@@ -72,8 +69,9 @@ while True:
     try:
         response = requests.post(URL_SERVIDOR, json=payload, timeout=5)
         if response.status_code == 200:
-            print(f"✅ [AQUECIDO] Sinal enviado: [{lat}, {lon}] | Bat: {battery}%")
+            print(f"✅ [SINAL SEGURO] Enviado: [{lat}, {lon}] | Bat: {battery}%")
     except Exception as e:
         print(f"❌ Aguardando rede: {e}")
 
-    time.sleep(10)
+    # Intervalo reduzido para 8 segundos para evitar que o Android desarme o chip por inatividade
+    time.sleep(8)
