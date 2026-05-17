@@ -97,8 +97,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
                             
-                            // SINTAXE CORRIGIDA DO JAVASCRIPT COM O SÍMBOLO DE $
-                            document.getElementById('lnk_maps').href = `https://www.google.com/maps?q=\${lastValidLat},\${lastValidLon}`;
+                            document.getElementById('lnk_maps').href = "https://www.google.com/maps?q=" + lastValidLat + "," + lastValidLon;
                         }
                     } catch (e) {}
                 }, 5000);
@@ -119,7 +118,7 @@ def index():
         if id_buscado in db_dispositivos:
             info_moto = db_dispositivos[id_buscado]
         else:
-            erro = "❌ ID NÃO ENCONTRADO."
+            erro = "ID NAO ENCONTRADO"
     return render_template_string(HTML_DASHBOARD_PRIVADO, id_buscado=id_buscado, info_moto=info_moto, erro=erro)
 
 @app.route('/api/status/<device_id>')
