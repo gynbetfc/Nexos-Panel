@@ -29,6 +29,8 @@ print("="*45 + "\n")
 ultima_lat_valida = -16.6869
 ultima_lon_valida = -49.2648
 
+headers_json = {"Content-Type": "application/json"}
+
 while True:
     t_inicio = time.time()
 
@@ -72,11 +74,10 @@ while True:
     }
 
     try:
-        response = requests.post(URL_SERVIDOR, json=payload, timeout=5)
+        response = requests.post(URL_SERVIDOR, data=json.dumps(payload), headers=headers_json, timeout=5)
         if response.status_code == 200:
             print(f"🛰️ [OK] Envio bem-sucedido! [{lat}, {lon}]")
     except Exception as e:
-        print(f"❌ Aguardando liberação de rede: {e}")
+        print(f"❌ Erro de transmissao: {e}")
 
-    # Intervalo calibrado para 4.5 segundos (Evita o ban de IP da Render grátis)
-    time.sleep(4.5)
+    time.sleep(5.0)
