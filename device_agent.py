@@ -22,8 +22,8 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR GPS PURA PRECISÃO // SINTAXE FIX")
-print(f"🔑  SEU MONITOR ID: {DEVICE_ID}")
+print(f"🛰️  MOTOR GPS PURA PRECISÃO // PRODUCTION")
+print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*45 + "\n")
 
 ultima_lat_valida = -16.6869
@@ -50,7 +50,6 @@ while True:
 
     lat, lon = ultima_lat_valida, ultima_lon_valida
     
-    # CORREÇÃO DA SINTAXE AQUI: Mudado de -request para -r para o Termux aceitar!
     out_loc = run_command("termux-location -p gps -r once")
     
     if out_loc:
