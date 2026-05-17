@@ -62,7 +62,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 
                 <div id="map_private" class="map-container"></div>
                 
-                <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
+                <a id="lnk_maps" href="http://googleusercontent.com/maps.google.com/6{{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
                     🗺️ Abrir no Google Maps
                 </a>
             </div>
@@ -84,6 +84,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             let nextLat = parseFloat(data.lat);
                             let nextLon = parseFloat(data.lon);
                             
+                            // Aceita qualquer coordenada que mude de fato da posição de erro inicial
                             if (!nextLat || !nextLon) return;
                             
                             lastValidLat = nextLat;
@@ -96,9 +97,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             const newPos = [lastValidLat, lastValidLon];
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
-                            
-                            // JAVASCRIPT AJUSTADO: Link oficial de busca do Maps sem caracteres quebrados
-                            document.getElementById('lnk_maps').href = `https://www.google.com/maps?q=${lastValidLat},${lastValidLon}`;
+                            document.getElementById('lnk_maps').href = `http://googleusercontent.com/maps.google.com/7{lastValidLat},${lastValidLon}`;
                         }
                     } catch (e) {}
                 }, 4000);
