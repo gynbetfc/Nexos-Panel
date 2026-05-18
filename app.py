@@ -14,50 +14,49 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXOS CORE // PRODUCTION PANEL</title>
+    <title>NEXOS // PAINEL DE MONITORAMENTO</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #070f15; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 15px; }
+        body { background: #0a0a0a; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 15px; }
         .wrapper { max-width: 900px; margin: 0 auto; }
         .header { text-align: center; margin-bottom: 20px; padding: 10px; border-bottom: 2px solid #1e293b; }
         .header h1 { font-size: 20px; color: #38bdf8; letter-spacing: 3px; font-weight: bold; }
         
-        .search-box { background: #0d1925; border: 1px solid #1e293b; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; }
-        .search-box input { width: 100%; max-width: 300px; background: #070f15; border: 1px solid #1e293b; padding: 12px; color: #34d399; font-weight: bold; text-align: center; border-radius: 6px; font-size: 16px; margin-bottom: 15px; letter-spacing: 2px; }
-        .search-box button { background: #38bdf8; color: #070f15; font-weight: bold; border: none; padding: 12px 30px; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 13px; }
+        .search-box { background: #111; border: 1px solid #1e293b; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; }
+        .search-box input { width: 100%; max-width: 300px; background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; color: #34d399; font-weight: bold; text-align: center; border-radius: 6px; font-size: 16px; margin-bottom: 15px; letter-spacing: 2px; }
+        .search-box button { background: #38bdf8; color: #0a0a0a; font-weight: bold; border: none; padding: 12px 30px; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 13px; }
         .search-box button:hover { background: #7dd3fc; }
         
-        .device-section { border: 1px solid #1e293b; border-radius: 12px; background: #0d1925; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+        .device-section { border: 1px solid #1e293b; border-radius: 12px; background: #111; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
         .device-title { font-size: 14px; color: #34d399; text-transform: uppercase; border-bottom: 1px solid #1e293b; padding-bottom: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; }
         
         .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
         @media(max-width: 600px) { .info-grid { grid-template-columns: 1fr 1fr; } }
         
-        .info-box { background: #070f15; border: 1px solid #1e293b; padding: 10px; border-radius: 6px; }
+        .info-box { background: #0a0a0a; border: 1px solid #1e293b; padding: 10px; border-radius: 6px; }
         .info-box span { font-size: 10px; color: #64748b; display: block; text-transform: uppercase; margin-bottom: 4px; }
         .info-box strong { font-size: 15px; color: #f1f5f9; }
         
-        .map-container { width: 100%; height: 260px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 10px; }
+        .map-container { width: 100%; height: 300px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 10px; }
         
         .map-controls { display: flex; gap: 10px; margin-bottom: 15px; }
-        .btn-maps { flex: 1; background: #22c55e; color: #ffffff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; }
+        .btn-maps { flex: 1; background: #22c55e; color: #fff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; }
         .btn-maps:hover { background: #4ade80; }
-        .btn-theme { background: #f59e0b; color: #070f15; border: none; padding: 12px 15px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; letter-spacing: 1px; }
-        .btn-theme:hover { background: #fbbf24; }
-        .btn-theme.light { background: #6366f1; color: white; }
+        .btn-theme { background: #6366f1; color: white; border: none; padding: 12px 15px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; letter-spacing: 1px; }
+        .btn-theme:hover { background: #818cf8; }
         
-        .btn-camera { display: block; width: 100%; background: #38bdf8; color: #070f15; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; cursor: pointer; margin-bottom: 20px; }
+        .btn-camera { display: block; width: 100%; background: #38bdf8; color: #0a0a0a; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; cursor: pointer; margin-bottom: 20px; }
         .btn-camera:hover { background: #7dd3fc; }
         .btn-camera:disabled { opacity: 0.5; cursor: not-allowed; }
         
         .cameras-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
         @media(max-width: 600px) { .cameras-row { grid-template-columns: 1fr; } }
         
-        .cam-card { background: #070f15; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; }
-        .cam-card-title { background: #0d1925; padding: 8px; font-size: 11px; color: #64748b; border-bottom: 1px solid #1e293b; font-weight: bold; text-transform: uppercase; }
-        .cam-frame { width: 100%; aspect-ratio: 4/3; background: #020609; display: flex; align-items: center; justify-content: center; }
+        .cam-card { background: #0a0a0a; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; }
+        .cam-card-title { background: #111; padding: 8px; font-size: 11px; color: #64748b; border-bottom: 1px solid #1e293b; font-weight: bold; text-transform: uppercase; }
+        .cam-frame { width: 100%; aspect-ratio: 4/3; background: #000; display: flex; align-items: center; justify-content: center; }
         .cam-frame img { width: 100%; height: 100%; object-fit: cover; display: none; }
         .cam-placeholder { font-size: 11px; color: #334155; text-transform: uppercase; }
         
@@ -66,13 +65,12 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         
         .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
         .status-online { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
-        .status-offline { background: #ef4444; }
     </style>
 </head>
 <body>
     <div class="wrapper">
         <div class="header">
-            <h1>NEXOS // PRODUCTION PANEL</h1>
+            <h1>NEXOS // PAINEL DE MONITORAMENTO</h1>
         </div>
 
         <div class="search-box">
@@ -99,43 +97,43 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 
                 <div class="info-grid">
                     <div class="info-box"><span>🔋 Bateria</span><strong id="txt_bateria" style="color: #22c55e;">{{ info_moto.battery }}%</strong></div>
-                    <div class="info-box"><span>⚡ Status Bat.</span><strong id="txt_bat_status">{{ info_moto.get('battery_status', '--') }}</strong></div>
+                    <div class="info-box"><span>⚡ Status</span><strong id="txt_bat_status">{{ info_moto.get('battery_status', '--') }}</strong></div>
                     <div class="info-box"><span>🌡️ Temp. Bat.</span><strong id="txt_bat_temp">{{ info_moto.get('battery_temp', '--') }}°C</strong></div>
                 </div>
                 
                 <div class="info-grid">
                     <div class="info-box"><span>💾 Armazenamento</span><strong id="txt_storage">{{ info_moto.storage }}</strong></div>
                     <div class="info-box"><span>🧠 RAM</span><strong id="txt_ram">{{ info_moto.get('ram', '--') }}</strong></div>
-                    <div class="info-box"><span>⏱️ Uptime</span><strong id="txt_uptime">{{ info_moto.get('uptime', '--') }}</strong></div>
+                    <div class="info-box"><span>⏱️ Tempo Ativo</span><strong id="txt_uptime">{{ info_moto.get('uptime', '--') }}</strong></div>
                 </div>
                 
                 <div class="info-grid">
-                    <div class="info-box"><span>🚀 Velocidade</span><strong id="txt_speed" style="color: #38bdf8;">{{ info_moto.get('speed', '0 km/h') }}</strong></div>
+                    <div class="info-box"><span>🚀 Velocidade</span><strong id="txt_speed" style="color: #38bdf8;">{{ info_moto.get('speed', '0') }} km/h</strong></div>
                     <div class="info-box"><span>📶 Rede</span><strong id="txt_network">{{ info_moto.get('network', '--') }}</strong></div>
-                    <div class="info-box"><span>🌡️ Temperatura</span><strong id="txt_temp">{{ info_moto.get('temperature', '--') }}</strong></div>
+                    <div class="info-box"><span>🌡️ Temperatura</span><strong id="txt_temp">{{ info_moto.get('temperature', '--') }}°C</strong></div>
                 </div>
                 
                 <div id="map_private" class="map-container"></div>
                 
                 <div class="map-controls">
                     <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
-                        🗺️ Google Maps
+                        🗺️ Abrir no Google Maps
                     </a>
-                    <button id="btnTheme" class="btn-theme" onclick="alternarTema()">☀️ Mapa Claro</button>
+                    <button id="btnTheme" class="btn-theme" onclick="alternarTema()">🌙 Mapa Escuro</button>
                 </div>
 
                 <button id="btnCam" class="btn-camera" onclick="dispararCapturaDupla()">📸 Iniciar Captura Sincronizada</button>
                 
                 <div class="cameras-row">
                     <div class="cam-card">
-                        <div class="cam-card-title">🎥 Camera Frontal</div>
+                        <div class="cam-card-title">🎥 Câmera Frontal</div>
                         <div class="cam-frame">
                             <span id="labelFront" class="cam-placeholder">Sem Sinal</span>
                             <img id="imgFront" src="" alt="Frontal">
                         </div>
                     </div>
                     <div class="cam-card">
-                        <div class="cam-card-title">🎥 Camera Traseira</div>
+                        <div class="cam-card-title">🎥 Câmera Traseira</div>
                         <div class="cam-frame">
                             <span id="labelBack" class="cam-placeholder">Sem Sinal</span>
                             <img id="imgBack" src="" alt="Traseira">
@@ -147,38 +145,37 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
             <script>
                 let lastValidLat = {{ info_moto.lat }};
                 let lastValidLon = {{ info_moto.lon }};
-                let mapaEscuro = true;
+                let mapaEscuro = false;
                 let map, marker, layerEscuro, layerClaro;
                 
-                // Camadas do mapa
+                // Camada CLARA como padrão
+                layerClaro = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap'
+                });
                 layerEscuro = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {});
-                layerClaro = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {});
                 
-                map = L.map('map_private', { zoomControl: true }).setView([lastValidLat, lastValidLon], 16);
-                layerEscuro.addTo(map);
+                map = L.map('map_private', { zoomControl: true }).setView([lastValidLat, lastValidLon], 17);
+                layerClaro.addTo(map);  // PADRÃO: MAPA CLARO
                 marker = L.marker([lastValidLat, lastValidLon]).addTo(map);
                 
-                // Função para alternar tema do mapa
                 function alternarTema() {
                     const btn = document.getElementById('btnTheme');
                     if (mapaEscuro) {
                         map.removeLayer(layerEscuro);
                         layerClaro.addTo(map);
                         btn.textContent = '🌙 Mapa Escuro';
-                        btn.classList.add('light');
                         mapaEscuro = false;
                     } else {
                         map.removeLayer(layerClaro);
                         layerEscuro.addTo(map);
                         btn.textContent = '☀️ Mapa Claro';
-                        btn.classList.remove('light');
                         mapaEscuro = true;
                     }
                 }
 
                 async function dispararCapturaDupla() {
                     const btn = document.getElementById('btnCam');
-                    btn.innerText = "⏳ Sincronizando Lentes...";
+                    btn.innerText = "⏳ Sincronizando...";
                     btn.disabled = true;
                     
                     try {
@@ -215,15 +212,12 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                 }
                                 
                                 tentativas++;
-                                if(tentativas > 30) { // 45 segundos de timeout
+                                if(tentativas > 40) {
                                     clearInterval(checagem);
                                     btn.innerText = "📸 Iniciar Captura Sincronizada";
                                     btn.disabled = false;
-                                    alert("Timeout: Verifique o dispositivo.");
                                 }
-                            } catch(e){
-                                console.error("Erro:", e);
-                            }
+                            } catch(e){}
                         }, 1500);
                         
                     } catch(e) {
@@ -232,7 +226,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     }
                 }
 
-                // Atualização RÁPIDA a cada 2 segundos
+                // Atualização a cada 3 segundos
                 setInterval(async () => {
                     try {
                         const response = await fetch('/api/status/' + '{{ id_buscado }}');
@@ -245,9 +239,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             document.getElementById('txt_storage').innerText = data.storage || '--';
                             document.getElementById('txt_ram').innerText = data.ram || '--';
                             document.getElementById('txt_uptime').innerText = data.uptime || '--';
-                            document.getElementById('txt_speed').innerText = data.speed || '0 km/h';
+                            document.getElementById('txt_speed').innerText = (data.speed || '0') + ' km/h';
                             document.getElementById('txt_network').innerText = data.network || '--';
-                            document.getElementById('txt_temp').innerText = data.temperature || '--';
+                            document.getElementById('txt_temp').innerText = (data.temperature || '--') + '°C';
                             
                             let tempElement = document.getElementById('txt_temp');
                             let temp = parseFloat(data.temperature);
@@ -255,21 +249,20 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             else if (temp > 35) tempElement.style.color = '#f59e0b';
                             else tempElement.style.color = '#22c55e';
                             
-                            // ATUALIZA LOCALIZAÇÃO IMEDIATAMENTE
                             let nextLat = parseFloat(data.lat);
                             let nextLon = parseFloat(data.lon);
-                            if (nextLat && nextLon) {
-                                lastValidLat = nextLat;
-                                lastValidLon = nextLon;
-                                marker.setLatLng([lastValidLat, lastValidLon]);
-                                map.panTo([lastValidLat, lastValidLon], {animate: true, duration: 0.5});
-                                document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lastValidLat + ',' + lastValidLon;
+                            if (nextLat && nextLon && nextLat !== 0 && nextLon !== 0) {
+                                if (nextLat !== lastValidLat || nextLon !== lastValidLon) {
+                                    lastValidLat = nextLat;
+                                    lastValidLon = nextLon;
+                                    marker.setLatLng([lastValidLat, lastValidLon]);
+                                    map.panTo([lastValidLat, lastValidLon]);
+                                    document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lastValidLat + ',' + lastValidLon;
+                                }
                             }
                         }
-                    } catch (e) {
-                        console.error("Erro ao atualizar:", e);
-                    }
-                }, 2000); // 2 segundos!
+                    } catch (e) {}
+                }, 3000);
             </script>
         {% endif %}
     </div>
@@ -285,14 +278,11 @@ def index():
     
     if request.method == 'POST':
         id_buscado = request.form.get('target_id', '').strip().upper()
-        logger.info(f"Buscando dispositivo: {id_buscado}")
         
         if id_buscado in db_dispositivos:
             info_moto = db_dispositivos[id_buscado]
-            logger.info(f"Dispositivo encontrado: {id_buscado}")
         else:
-            erro = "ID NAO ENCONTRADO NA REDE NEXOS"
-            logger.warning(f"Dispositivo nao encontrado: {id_buscado}")
+            erro = "ID NÃO ENCONTRADO NA REDE NEXOS"
             
     return render_template_string(HTML_DASHBOARD_PRIVADO, id_buscado=id_buscado, info_moto=info_moto, erro=erro)
 
@@ -300,49 +290,48 @@ def index():
 def api_status(device_id):
     device_id = device_id.upper()
     if device_id in db_dispositivos:
-        device = db_dispositivos[device_id]
+        d = db_dispositivos[device_id]
         return jsonify({
-            "battery": device.get("battery", "N/A"),
-            "battery_status": device.get("battery_status", "N/A"),
-            "battery_temp": device.get("battery_temp", "N/A"),
-            "storage": device.get("storage", "N/A"),
-            "uptime": device.get("uptime", "N/A"),
-            "lat": device.get("lat", 0),
-            "lon": device.get("lon", 0),
-            "speed": device.get("speed", "0 km/h"),
-            "temperature": device.get("temperature", "N/A"),
-            "network": device.get("network", "N/A"),
-            "ram": device.get("ram", "N/A"),
-            "timestamp": device.get("timestamp", "")
+            "battery": d.get("battery", "N/A"),
+            "battery_status": d.get("battery_status", "Normal"),
+            "battery_temp": d.get("battery_temp", "N/A"),
+            "storage": d.get("storage", "N/A"),
+            "uptime": d.get("uptime", "N/A"),
+            "lat": d.get("lat", 0),
+            "lon": d.get("lon", 0),
+            "speed": d.get("speed", "0"),
+            "temperature": d.get("temperature", "N/A"),
+            "network": d.get("network", "N/A"),
+            "ram": d.get("ram", "N/A")
         }), 200
     return jsonify({"error": "Not found"}), 404
 
 @app.route('/update', methods=['POST'])
 def update():
-    global db_dispositivos
     data = request.get_json(force=True, silent=True) or {}
     device_id = data.get('device_id', '').upper()
     
-    if not device_id: 
+    if not device_id:
         return jsonify({"status": "error"}), 400
     
-    if device_id not in db_dispositivos: 
+    if device_id not in db_dispositivos:
         db_dispositivos[device_id] = {}
-        logger.info(f"Novo dispositivo: {device_id}")
+    
+    lat = float(data.get("lat", -16.6869))
+    lon = float(data.get("lon", -49.2648))
     
     db_dispositivos[device_id].update({
         "battery": data.get("battery", "N/A"),
-        "battery_status": data.get("battery_status", "N/A"),
+        "battery_status": data.get("battery_status", "Normal"),
         "battery_temp": data.get("battery_temp", "N/A"),
         "storage": data.get("storage", "N/A"),
         "uptime": data.get("uptime", "N/A"),
-        "lat": float(data.get("lat", -16.6869)),
-        "lon": float(data.get("lon", -49.2648)),
-        "speed": data.get("speed", "0 km/h"),
+        "lat": lat,
+        "lon": lon,
+        "speed": data.get("speed", "0"),
         "temperature": data.get("temperature", "N/A"),
         "network": data.get("network", "N/A"),
         "ram": data.get("ram", "N/A"),
-        "timestamp": data.get("timestamp", ""),
         "last_seen": datetime.utcnow().isoformat()
     })
     
@@ -356,7 +345,7 @@ def comando_camera(device_id):
     device_id = device_id.upper()
     data = request.get_json(force=True, silent=True) or {}
     
-    if device_id not in db_dispositivos: 
+    if device_id not in db_dispositivos:
         db_dispositivos[device_id] = {}
     
     db_dispositivos[device_id]["cmd_cam"] = data.get("acao", "wait")
@@ -367,40 +356,18 @@ def comando_camera(device_id):
 
 @app.route('/api/upload_lote', methods=['POST'])
 def upload_lote():
-    """Recebe as duas fotos em um único pacote"""
     data = request.get_json(force=True, silent=True) or {}
     dev_id = data.get("device_id", '').upper()
-    foto_front = data.get("photo_front", "")
-    foto_back = data.get("photo_back", "")
-    
-    logger.info(f"LOTE recebido de {dev_id} - Front: {len(foto_front)} chars, Back: {len(foto_back)} chars")
     
     if dev_id and dev_id in db_dispositivos:
-        if foto_front:
-            db_dispositivos[dev_id]["photo_front"] = foto_front
-        if foto_back:
-            db_dispositivos[dev_id]["photo_back"] = foto_back
+        if data.get("photo_front"):
+            db_dispositivos[dev_id]["photo_front"] = data["photo_front"]
+        if data.get("photo_back"):
+            db_dispositivos[dev_id]["photo_back"] = data["photo_back"]
         
-        return jsonify({
-            "status": "stored",
-            "front_received": bool(foto_front),
-            "back_received": bool(foto_back)
-        }), 200
-    
-    return jsonify({"status": "error"}), 404
-
-@app.route('/api/upload_camera', methods=['POST'])
-def upload_camera():
-    data = request.get_json(force=True, silent=True) or {}
-    dev_id = data.get("device_id", '').upper()
-    tipo = data.get("tipo")
-    foto = data.get("photo", "")
-    
-    if dev_id and dev_id in db_dispositivos and foto:
-        db_dispositivos[dev_id][f"photo_{tipo}"] = foto
         return jsonify({"status": "stored"}), 200
     
-    return jsonify({"status": "error"}), 400
+    return jsonify({"status": "error"}), 404
 
 @app.route('/api/get_camera/<device_id>')
 def get_camera(device_id):
