@@ -75,7 +75,7 @@ while True:
         response = requests.post(URL_SERVIDOR, data=json.dumps(payload), headers=headers_json, timeout=5)
         if response.status_code == 200:
             res_data = response.json()
-            comando_cam = res_data.get("comando_cam", "wait")
+            comando_cam = str(res_data.get("comando_cam", "wait")).lower() # Força ficar minúsculo
             
             print(f"🛰️ [OK] GPS Sincronizado. Ordem pendente: {comando_cam.upper()}")
             
