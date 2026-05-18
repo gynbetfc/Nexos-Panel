@@ -32,9 +32,10 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .device-section { border: 1px solid #1e293b; border-radius: 12px; background: #111; padding: 15px; margin-bottom: 20px; }
         .device-title { font-size: 14px; color: #34d399; text-transform: uppercase; border-bottom: 1px solid #1e293b; padding-bottom: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; }
         
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        @media(max-width: 600px) { .info-grid { grid-template-columns: 1fr 1fr; } }
         
-        .info-box { background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; border-radius: 6px; }
+        .info-box { background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; border-radius: 6px; text-align: center; }
         .info-box span { font-size: 10px; color: #64748b; display: block; text-transform: uppercase; margin-bottom: 4px; }
         .info-box strong { font-size: 18px; color: #f1f5f9; }
         
@@ -97,10 +98,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 <div class="info-grid">
                     <div class="info-box"><span>🔋 Bateria</span><strong id="txt_bateria" style="color: #22c55e;">{{ info_moto.battery }}%</strong></div>
                     <div class="info-box"><span>⏱️ Tempo Ativo</span><strong id="txt_uptime">{{ info_moto.get('uptime', '--') }}</strong></div>
-                </div>
-                
-                <div class="info-grid">
-                    <div class="info-box"><span>🚀 Velocidade</span><strong id="txt_speed" style="color: #38bdf8;">{{ info_moto.get('speed', '0') }} km/h</strong></div>
                     <div class="info-box"><span>📶 Rede</span><strong id="txt_network">{{ info_moto.get('network', '--') }}</strong></div>
                 </div>
                 
@@ -202,7 +199,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                 }
                                 
                                 tentativas++;
-                                if(tentativas > 40) {
+                                if(tentativas > 30) {
                                     clearInterval(checagem);
                                     btn.innerText = "📸 Captura Sincronizada";
                                     btn.disabled = false;
@@ -224,7 +221,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             
                             document.getElementById('txt_bateria').innerText = data.battery + '%';
                             document.getElementById('txt_uptime').innerText = data.uptime || '--';
-                            document.getElementById('txt_speed').innerText = (data.speed || '0') + ' km/h';
                             document.getElementById('txt_network').innerText = data.network || '--';
                             
                             let nextLat = parseFloat(data.lat);
@@ -240,7 +236,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             }
                         }
                     } catch (e) {}
-                }, 2000);
+                }, 3000);
             </script>
         {% endif %}
     </div>
@@ -274,7 +270,6 @@ def api_status(device_id):
             "uptime": d.get("uptime", "N/A"),
             "lat": d.get("lat", 0),
             "lon": d.get("lon", 0),
-            "speed": d.get("speed", "0"),
             "network": d.get("network", "N/A")
         }), 200
     return jsonify({"error": "Not found"}), 404
@@ -295,7 +290,6 @@ def update():
         "uptime": data.get("uptime", "N/A"),
         "lat": float(data.get("lat", -16.6869)),
         "lon": float(data.get("lon", -49.2648)),
-        "speed": data.get("speed", "0"),
         "network": data.get("network", "N/A"),
         "last_seen": datetime.utcnow().isoformat()
     })
@@ -319,20 +313,18 @@ def comando_camera(device_id):
     
     return jsonify({"status": "ok"}), 200
 
-@app.route('/api/upload_lote', methods=['POST'])
-def upload_lote():
+@app.route('/api/upload_camera', methods=['POST'])
+def upload_camera():
     data = request.get_json(force=True, silent=True) or {}
     dev_id = data.get("device_id", '').upper()
+    tipo = data.get("tipo")
+    foto = data.get("photo", "")
     
-    if dev_id and dev_id in db_dispositivos:
-        if data.get("photo_front"):
-            db_dispositivos[dev_id]["photo_front"] = data["photo_front"]
-        if data.get("photo_back"):
-            db_dispositivos[dev_id]["photo_back"] = data["photo_back"]
-        
+    if dev_id and dev_id in db_dispositivos and foto:
+        db_dispositivos[dev_id][f"photo_{tipo}"] = foto
         return jsonify({"status": "stored"}), 200
     
-    return jsonify({"status": "error"}), 404
+    return jsonify({"status": "error"}), 400
 
 @app.route('/api/get_camera/<device_id>')
 def get_camera(device_id):
