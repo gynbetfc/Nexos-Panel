@@ -31,11 +31,9 @@ print(f"🛰️  MOTOR NEXOS DUAL STREAM CARD OPERACIONAL")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*50 + "\n")
 
-# Posição - NUNCA reseta, mantém última válida
-ultima_lat_valida = -16.6869
-ultima_lon_valida = -49.2648
-gps_atualizado = False
-gps_lock = threading.Lock()
+# POSIÇÃO - NUNCA RESETA
+POSICAO = {"lat": -16.6869, "lon": -49.2648, "atualizado": False}
+posicao_lock = threading.Lock()
 headers_json = {"Content-Type": "application/json"}
 inicio_operacao = datetime.now()
 
@@ -50,56 +48,75 @@ def obter_status_rede():
         except: pass
     return "Dados Moveis"
 
-def atualizar_gps():
-    """Thread separada - NUNCA trava o loop principal"""
-    global ultima_lat_valida, ultima_lon_valida, gps_atualizado
+def thread_gps():
+    """Thread COMPLETAMENTE ISOLADA - se travar, nao afeta nada"""
     while True:
         try:
-            resultado = subprocess.run(
+            # Usa Popen para nao travar NUNCA
+            proc = subprocess.Popen(
                 "termux-location -p gps -r once",
-                shell=True, capture_output=True, text=True, timeout=8
+                shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
             )
-            if resultado.stdout:
-                dados = json.loads(resultado.stdout.strip())
-                lat = dados.get("latitude")
-                lon = dados.get("longitude")
-                if lat and lon and float(lat) != 0 and float(lon) != 0:
-                    with gps_lock:
-                        ultima_lat_valida = float(lat)
-                        ultima_lon_valida = float(lon)
-                        gps_atualizado = True
+            # Espera no maximo 8 segundos
+            try:
+                stdout, _ = proc.communicate(timeout=8)
+                if stdout:
+                    dados = json.loads(stdout.decode().strip())
+                    lat = dados.get("latitude")
+                    lon = dados.get("longitude")
+                    if lat and lon and float(lat) != 0 and float(lon) != 0:
+                        with posicao_lock:
+                            POSICAO["lat"] = float(lat)
+                            POSICAO["lon"] = float(lon)
+                            POSICAO["atualizado"] = True
+            except:
+                proc.kill()
         except:
             pass
-        time.sleep(10)  # Tenta GPS a cada 10 segundos
+        time.sleep(5)
 
-def capturar_e_enviar_foto(tipo, numero_camera):
-    if os.path.exists(ARQUIVO_FOTO):
-        os.remove(ARQUIVO_FOTO)
-    
-    subprocess.run(f"termux-camera-photo -c {numero_camera} {ARQUIVO_FOTO}", 
-                   shell=True, timeout=5)
-    time.sleep(1.5)
-    
-    if os.path.exists(ARQUIVO_FOTO) and os.path.getsize(ARQUIVO_FOTO) > 0:
-        with open(ARQUIVO_FOTO, "rb") as img_file:
-            foto_b64 = base64.b64encode(img_file.read()).decode('utf-8')
+def thread_camera(comando):
+    """Thread para camera - envia foto sem travar loop"""
+    tipo, num = comando
+    try:
+        if os.path.exists(ARQUIVO_FOTO):
+            os.remove(ARQUIVO_FOTO)
         
-        payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": foto_b64}
+        proc = subprocess.Popen(
+            f"termux-camera-photo -c {num} {ARQUIVO_FOTO}",
+            shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
         try:
-            response = requests.post(URL_UPLOAD_FOTO, data=json.dumps(payload), headers=headers_json, timeout=20)
-            return response.status_code == 200
+            proc.communicate(timeout=6)
         except:
-            pass
-    return False
+            proc.kill()
+        
+        time.sleep(1)
+        
+        if os.path.exists(ARQUIVO_FOTO) and os.path.getsize(ARQUIVO_FOTO) > 100:
+            with open(ARQUIVO_FOTO, "rb") as img_file:
+                foto_b64 = base64.b64encode(img_file.read()).decode('utf-8')
+            
+            payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": foto_b64}
+            try:
+                requests.post(URL_UPLOAD_FOTO, data=json.dumps(payload), headers=headers_json, timeout=15)
+                print(f"   📸 {tipo} enviada!")
+            except:
+                print(f"   ❌ Falha ao enviar {tipo}")
+        
+        if os.path.exists(ARQUIVO_FOTO):
+            os.remove(ARQUIVO_FOTO)
+    except:
+        pass
 
 # Inicia thread do GPS
-threading.Thread(target=atualizar_gps, daemon=True).start()
-print("🛰️  GPS em thread separada - Loop principal LIVRE!\n")
+threading.Thread(target=thread_gps, daemon=True).start()
+print("🛰️  GPS isolado em thread - Loop LIVRE!\n")
 
-# Loop principal ULTRARRÁPIDO
+# LOOP PRINCIPAL - ULTRARRÁPIDO
 while True:
-    ciclo_inicio = time.time()
-    timestamp_atual = datetime.now()
+    t0 = time.time()
+    ts = datetime.now()
     
     # BATERIA
     battery = "N/A"
@@ -110,17 +127,14 @@ while True:
             battery = str(bat_data.get("percentage", "N/A"))
         except: pass
     
-    # PEGA POSIÇÃO ATUAL (sem esperar GPS)
-    with gps_lock:
-        lat = ultima_lat_valida
-        lon = ultima_lon_valida
-        gps_ok = gps_atualizado
-        gps_atualizado = False  # Reseta flag
+    # POSIÇÃO (sem delay)
+    with posicao_lock:
+        lat = POSICAO["lat"]
+        lon = POSICAO["lon"]
+        gps_ok = POSICAO["atualizado"]
+        POSICAO["atualizado"] = False
     
-    # UPTIME
     uptime = str(datetime.now() - inicio_operacao).split('.')[0]
-    
-    # REDE
     rede = obter_status_rede()
     
     payload = {
@@ -129,8 +143,7 @@ while True:
         "uptime": uptime,
         "lat": lat,
         "lon": lon,
-        "network": rede,
-        "timestamp": timestamp_atual.isoformat()
+        "network": rede
     }
     
     try:
@@ -140,24 +153,15 @@ while True:
             comando_cam = str(res_data.get("comando_cam", "wait")).lower()
             
             gps_icon = "📍" if gps_ok else "📡"
-            ciclo_tempo = time.time() - ciclo_inicio
-            print(f"{gps_icon} [{timestamp_atual.strftime('%H:%M:%S')}] Bat:{battery}% {rede} | {ciclo_tempo:.1f}s")
+            dt = time.time() - t0
+            print(f"{gps_icon} [{ts.strftime('%H:%M:%S')}] Bat:{battery}% {rede} | {dt:.1f}s")
             
             if comando_cam == "take_dual":
-                print("📸 [DUAL] Capturando...")
-                ok1 = capturar_e_enviar_foto("back", 0)
-                ok2 = capturar_e_enviar_foto("front", 1)
-                
-                if ok1 and ok2:
-                    print("   ✅ Fotos enviadas!")
-                elif ok1 or ok2:
-                    print("   ⚠️ Apenas uma foto")
-                else:
-                    print("   ❌ Falha")
-                
-                if os.path.exists(ARQUIVO_FOTO):
-                    os.remove(ARQUIVO_FOTO)
-    except Exception as e:
-        print(f"⚠️ {str(e)[:40]}")
+                print("📸 [DUAL] Disparando cameras em paralelo...")
+                threading.Thread(target=thread_camera, args=(("back", 0),), daemon=True).start()
+                threading.Thread(target=thread_camera, args=(("front", 1),), daemon=True).start()
+    except:
+        dt = time.time() - t0
+        print(f"⚠️ [{ts.strftime('%H:%M:%S')}] Sem conexao | {dt:.1f}s")
     
     time.sleep(2.0)
