@@ -25,7 +25,7 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR NEXOS AUDIO FORCE CLOCK TIMED")
+print(f"🛰️  MOTOR NEXOS AUDIO COMPRESSED // LIGHTWEIGHT")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*45 + "\n")
 
@@ -83,22 +83,17 @@ while True:
             print(f"🛰️ [OK] Sincronizado. Status Escuta: {comando_audio.upper()}")
             
             if comando_audio == "start":
-                print("🎙️ [AÇÃO] Iniciando gravacao forçada...")
-                
-                # Garante que não tem gravação órfã aberta antes de ligar
+                print("🎙️ [AÇÃO] Gravando em modo ultra-leve (Bitrate Reduzido)...")
                 run_command("termux-microphone-record -q")
                 
-                # Inicia a gravação contínua sem passar o tempo bugado do terminal
-                run_command("termux-microphone-record")
+                # NOVIDADE: Força o Android a gravar em 16kbps (qualidade de rádio/fone), reduzindo o peso em 90%
+                run_command("termux-microphone-record --bitrate 16000")
                 
-                # O Python segura o tempo exato em segundo plano por 3 segundos
                 time.sleep(3.0) 
-                
-                # O próprio Python manda o comando de corte cirúrgico no soco!
                 run_command("termux-microphone-record -q")
-                print("🎙️ [AÇÃO] Gravacao finalizada pelo sistema.")
+                print("🎙️ [AÇÃO] Gravacao finalizada.")
                 
-                # Caça o arquivo gerado na pasta do Termux
+                # Caça o arquivo gerado
                 arquivos_gravados = glob.glob("/storage/emulated/0/TermuxAudioRecording_*.m4a")
                 if arquivos_gravados:
                     ultimo_audio = max(arquivos_gravados, key=os.path.getctime)
@@ -107,15 +102,14 @@ while True:
                         with open(ultimo_audio, "rb") as audio_file:
                             audio_b64 = base64.b64encode(audio_file.read()).decode('utf-8')
                         
-                        # Cospe o arquivo base64 pro servidor
+                        # Transmite com margem de segurança de 10 segundos para conexões oscilantes de motoboy
                         payload_audio = {"device_id": DEVICE_ID, "audio": audio_b64}
-                        requests.post(URL_UPLOAD_AUDIO, data=json.dumps(payload_audio), headers=headers_json, timeout=5)
-                        print("🚀 [OK] Arquivo de audio .m4a enviado pro painel com sucesso!")
+                        requests.post(URL_UPLOAD_AUDIO, data=json.dumps(payload_audio), headers=headers_json, timeout=10)
+                        print("🚀 [OK] Lote de áudio ultra-leve enviado pro painel!")
                         
-                        # Apaga o arquivo do celular para não entupir a memória da moto
                         os.remove(ultimo_audio)
                         
     except Exception as e:
-        print(f"❌ Falha no ciclo: {e}")
+        print(f"⚠️ Alerta de ciclo: {e}")
 
     time.sleep(2.0)
