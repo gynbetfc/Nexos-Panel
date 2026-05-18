@@ -5,7 +5,8 @@ import requests
 import os
 import uuid
 
-URL_SERVIDOR = "https://nexos-t0to.onrender.com/update"
+# MUDANÇA ESSENCIAL: URL unificada apontando para o seu painel ativo de produção
+URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
 
 def run_command(cmd):
