@@ -77,7 +77,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 
                 setInterval(async () => {
                     try {
-                        const response = await fetch('/api/status/{{ id_buscado }}');
+                        const response = await fetch('/api/status/' + '{{ id_buscado }}');
                         if (response.ok) {
                             const data = await response.json();
                             
@@ -97,7 +97,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             marker.setLatLng(newPos);
                             map.panTo(newPos);
                             
-                            // CORREÇÃO CRUCIAL AQUI: Aspas simples eliminam o conflito de renderização!
                             document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lastValidLat + ',' + lastValidLon;
                         }
                     } catch (e) {}
@@ -117,7 +116,7 @@ def index():
     if request.method == 'POST':
         id_buscado = request.form.get('target_id', '').strip()
         if id_buscado in db_dispositivos:
-            info_moto = db_dispositivos[id_buscado]
+            info_moto = db_dispositivos[id_bus传统 ] = db_dispositivos[id_buscado]
         else:
             erro = "ID NAO ENCONTRADO"
     return render_template_string(HTML_DASHBOARD_PRIVADO, id_buscado=id_buscado, info_moto=info_moto, erro=erro)
