@@ -34,107 +34,105 @@ print("="*50 + "\n")
 
 ultima_lat_valida = -16.6869
 ultima_lon_valida = -49.2648
-ultimo_timestamp = datetime.now()
 ultimo_gps_valido = None
 headers_json = {"Content-Type": "application/json"}
 inicio_operacao = datetime.now()
 
+# Cache para evitar leituras repetidas
+_cache_temperatura = {"valor": "N/A", "timestamp": datetime.now()}
+_cache_rede = {"valor": "WiFi", "timestamp": datetime.now()}
+_cache_ram = {"valor": "N/A", "timestamp": datetime.now()}
+
 def obter_temperatura():
-    caminhos = [
-        "/sys/class/thermal/thermal_zone0/temp",
-        "/sys/class/hwmon/hwmon0/temp1_input"
-    ]
-    for caminho in caminhos:
-        if os.path.exists(caminho):
-            try:
-                with open(caminho, 'r') as f:
-                    temp = int(f.read().strip()) / 1000
-                    return f"{temp:.1f}"
-            except: pass
-    return "N/A"
+    global _cache_temperatura
+    agora = datetime.now()
+    if (agora - _cache_temperatura["timestamp"]).seconds < 10:
+        return _cache_temperatura["valor"]
+    
+    try:
+        with open("/sys/class/thermal/thermal_zone0/temp", 'r') as f:
+            temp = int(f.read().strip()) / 1000
+            _cache_temperatura = {"valor": f"{temp:.1f}", "timestamp": agora}
+            return _cache_temperatura["valor"]
+    except:
+        return _cache_temperatura["valor"]
 
 def obter_status_rede():
+    global _cache_rede
+    agora = datetime.now()
+    if (agora - _cache_rede["timestamp"]).seconds < 15:
+        return _cache_rede["valor"]
+    
     wifi = run_command("termux-wifi-connectioninfo")
     if wifi:
         try:
             info = json.loads(wifi)
             ssid = info.get("ssid", "")
             if ssid and ssid != "<unknown ssid>":
-                return f"WiFi: {ssid}"
+                _cache_rede = {"valor": f"WiFi: {ssid}", "timestamp": agora}
+                return _cache_rede["valor"]
         except: pass
-    
-    # Verifica dados móveis
-    dados = run_command("termux-telephony-deviceinfo")
-    if dados:
-        return "Dados Moveis"
-    return "WiFi"
+    _cache_rede = {"valor": "Dados Moveis", "timestamp": agora}
+    return _cache_rede["valor"]
 
 def obter_ram():
+    global _cache_ram
+    agora = datetime.now()
+    if (agora - _cache_ram["timestamp"]).seconds < 8:
+        return _cache_ram["valor"]
+    
     mem = run_command("free -h | grep Mem")
     if mem:
         parts = mem.split()
         if len(parts) >= 4:
-            return f"{parts[3]} livres"
-    return "N/A"
+            _cache_ram = {"valor": f"{parts[3]} livres", "timestamp": agora}
+            return _cache_ram["valor"]
+    return _cache_ram["valor"]
 
 def calcular_velocidade(lat1, lon1, lat2, lon2, t1, t2):
     if lat1 == lat2 and lon1 == lon2:
         return "0.0"
-    
     delta_segundos = (t2 - t1).total_seconds()
     if delta_segundos <= 0:
         return "0.0"
-    
     R = 6371
     dlat = radians(lat2 - lat1)
     dlon = radians(lon2 - lon1)
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
     c = 2 * atan2(sqrt(a), sqrt(1-a))
     distancia_km = R * c
-    
     velocidade_kmh = (distancia_km / delta_segundos) * 3600
     return f"{velocidade_kmh:.1f}"
 
 def capturar_foto(numero_camera, arquivo_destino):
     if os.path.exists(arquivo_destino):
         os.remove(arquivo_destino)
-    
-    cmd = f"termux-camera-photo -c {numero_camera} {arquivo_destino}"
-    run_command(cmd)
-    time.sleep(2.5)
-    
+    run_command(f"termux-camera-photo -c {numero_camera} {arquivo_destino}")
+    time.sleep(2)
     if os.path.exists(arquivo_destino) and os.path.getsize(arquivo_destino) > 0:
         with open(arquivo_destino, "rb") as img_file:
-            foto_b64 = base64.b64encode(img_file.read()).decode('utf-8')
-        return foto_b64
+            return base64.b64encode(img_file.read()).decode('utf-8')
     return None
 
 def enviar_fotos_lote(foto_frontal_b64, foto_traseira_b64):
     if not foto_frontal_b64 and not foto_traseira_b64:
         return False
-    
     payload = {
         "device_id": DEVICE_ID,
         "photo_front": foto_frontal_b64 or "",
         "photo_back": foto_traseira_b64 or ""
     }
-    
     try:
-        response = requests.post(
-            URL_UPLOAD_LOTE,
-            data=json.dumps(payload),
-            headers=headers_json,
-            timeout=60
-        )
+        response = requests.post(URL_UPLOAD_LOTE, data=json.dumps(payload), headers=headers_json, timeout=45)
         return response.status_code == 200
     except:
         return False
 
-# Loop principal
+# Loop principal RÁPIDO
 while True:
     timestamp_atual = datetime.now()
     
-    # BATERIA - Corrigido
+    # BATERIA - Comando rápido
     battery = "N/A"
     status_bat = "Normal"
     temp_bat = "N/A"
@@ -143,24 +141,15 @@ while True:
         try:
             bat_data = json.loads(out_bat)
             battery = str(bat_data.get("percentage", "N/A"))
-            
-            # Traduzir status da bateria
             status_raw = bat_data.get("status", "").upper()
-            if "CHARGING" in status_raw:
-                status_bat = "Carregando"
-            elif "DISCHARGING" in status_raw:
-                status_bat = "Em uso"
-            elif "FULL" in status_raw:
-                status_bat = "Cheia"
-            else:
-                status_bat = "Normal"
-            
+            if "CHARGING" in status_raw: status_bat = "Carregando"
+            elif "DISCHARGING" in status_raw: status_bat = "Em uso"
+            elif "FULL" in status_raw: status_bat = "Cheia"
             temp_raw = bat_data.get("temperature", 0)
-            if temp_raw:
-                temp_bat = f"{float(temp_raw)}"
+            if temp_raw: temp_bat = f"{float(temp_raw)}"
         except: pass
     
-    # ARMAZENAMENTO
+    # ARMAZENAMENTO - Rápido
     storage = "N/A"
     out_df = run_command("df -h /data/data/com.termux/files/home")
     if out_df:
@@ -171,7 +160,7 @@ while True:
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
     
-    # GPS - Forçar atualização
+    # GPS - SEM ESPERA SE FALHAR
     lat, lon = ultima_lat_valida, ultima_lon_valida
     velocidade = "0.0"
     gps_atualizado = False
@@ -182,41 +171,16 @@ while True:
             loc_data = json.loads(out_loc)
             lat_novo = loc_data.get("latitude")
             lon_novo = loc_data.get("longitude")
-            
             if lat_novo and lon_novo and lat_novo != 0 and lon_novo != 0:
                 if ultimo_gps_valido:
-                    velocidade = calcular_velocidade(
-                        ultima_lat_valida, ultima_lon_valida,
-                        lat_novo, lon_novo,
-                        ultimo_gps_valido, timestamp_atual
-                    )
-                
-                lat = lat_novo
-                lon = lon_novo
-                ultima_lat_valida = lat
-                ultima_lon_valida = lon
+                    velocidade = calcular_velocidade(ultima_lat_valida, ultima_lon_valida, lat_novo, lon_novo, ultimo_gps_valido, timestamp_atual)
+                lat, lon = lat_novo, lon_novo
+                ultima_lat_valida, ultima_lon_valida = lat, lon
                 ultimo_gps_valido = timestamp_atual
                 gps_atualizado = True
         except: pass
     
-    # Se GPS não atualizou, tenta novamente
-    if not gps_atualizado:
-        time.sleep(1)
-        out_loc = run_command("termux-location -p gps -r once")
-        if out_loc:
-            try:
-                loc_data = json.loads(out_loc)
-                lat_novo = loc_data.get("latitude")
-                lon_novo = loc_data.get("longitude")
-                if lat_novo and lon_novo and lat_novo != 0 and lon_novo != 0:
-                    lat = lat_novo
-                    lon = lon_novo
-                    ultima_lat_valida = lat
-                    ultima_lon_valida = lon
-                    ultimo_gps_valido = timestamp_atual
-                    gps_atualizado = True
-            except: pass
-    
+    # USA CACHE para leituras pesadas
     uptime = str(datetime.now() - inicio_operacao).split('.')[0]
     temperatura = obter_temperatura()
     rede = obter_status_rede()
@@ -240,32 +204,26 @@ while True:
     }
     
     try:
-        response = requests.post(URL_SERVIDOR, data=json.dumps(payload), headers=headers_json, timeout=10)
+        response = requests.post(URL_SERVIDOR, data=json.dumps(payload), headers=headers_json, timeout=5)
         if response.status_code == 200:
             res_data = response.json()
             comando_cam = str(res_data.get("comando_cam", "wait")).lower()
             
             gps_icon = "📍" if gps_atualizado else "📡"
-            print(f"{gps_icon} [{timestamp_atual.strftime('%H:%M:%S')}] OK | Bat:{battery}% | Vel:{velocidade} km/h")
-            print(f"   Status:{status_bat} | GPS:{'SIM' if gps_atualizado else 'ULTIMA'} | {rede}")
+            print(f"{gps_icon} [{timestamp_atual.strftime('%H:%M:%S')}] Bat:{battery}% Vel:{velocidade}km/h {rede}")
             
             if comando_cam == "take_dual":
-                print("\n📸 [DUAL] Capturando fotos...")
-                
+                print("📸 [DUAL] Capturando...")
                 foto_tras = capturar_foto(0, ARQUIVO_FOTO_TRASEIRA)
-                time.sleep(0.5)
                 foto_front = capturar_foto(1, ARQUIVO_FOTO_FRONTAL)
-                
-                print("📤 Enviando lote...")
+                print("📤 Enviando lote..." if (foto_tras or foto_front) else "❌ Sem fotos")
                 if enviar_fotos_lote(foto_front, foto_tras):
-                    print("✅ Fotos enviadas!\n")
+                    print("✅ Fotos enviadas!")
                 else:
-                    print("❌ Falha no envio\n")
-                
-                for arquivo in [ARQUIVO_FOTO_FRONTAL, ARQUIVO_FOTO_TRASEIRA]:
-                    if os.path.exists(arquivo): os.remove(arquivo)
-                    
+                    print("❌ Falha")
+                for a in [ARQUIVO_FOTO_FRONTAL, ARQUIVO_FOTO_TRASEIRA]:
+                    if os.path.exists(a): os.remove(a)
     except Exception as e:
-        print(f"⚠️ Erro: {e}")
+        print(f"⚠️ {str(e)[:50]}")
     
-    time.sleep(3.0)
+    time.sleep(2.0)
