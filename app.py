@@ -39,9 +39,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .info-box span { font-size: 10px; color: #64748b; display: block; text-transform: uppercase; margin-bottom: 4px; }
         .info-box strong { font-size: 15px; color: #f1f5f9; }
         
-        .map-container { width: 100%; height: 260px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 15px; }
-        .btn-maps { display: block; width: 100%; background: #22c55e; color: #ffffff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; margin-bottom: 15px; }
+        .map-container { width: 100%; height: 260px; border-radius: 8px; background: #040a0f; border: 1px solid #1e293b; margin-bottom: 10px; }
+        
+        .map-controls { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-maps { flex: 1; background: #22c55e; color: #ffffff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; }
         .btn-maps:hover { background: #4ade80; }
+        .btn-theme { background: #f59e0b; color: #070f15; border: none; padding: 12px 15px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; letter-spacing: 1px; }
+        .btn-theme:hover { background: #fbbf24; }
+        .btn-theme.light { background: #6366f1; color: white; }
         
         .btn-camera { display: block; width: 100%; background: #38bdf8; color: #070f15; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; letter-spacing: 1px; cursor: pointer; margin-bottom: 20px; }
         .btn-camera:hover { background: #7dd3fc; }
@@ -112,22 +117,25 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 
                 <div id="map_private" class="map-container"></div>
                 
-                <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
-                    🗺️ Abrir no Google Maps
-                </a>
+                <div class="map-controls">
+                    <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">
+                        🗺️ Google Maps
+                    </a>
+                    <button id="btnTheme" class="btn-theme" onclick="alternarTema()">☀️ Mapa Claro</button>
+                </div>
 
                 <button id="btnCam" class="btn-camera" onclick="dispararCapturaDupla()">📸 Iniciar Captura Sincronizada</button>
                 
                 <div class="cameras-row">
                     <div class="cam-card">
-                        <div class="cam-card-title">🎥 Camera Frontal - Em Tempo Real</div>
+                        <div class="cam-card-title">🎥 Camera Frontal</div>
                         <div class="cam-frame">
                             <span id="labelFront" class="cam-placeholder">Sem Sinal</span>
                             <img id="imgFront" src="" alt="Frontal">
                         </div>
                     </div>
                     <div class="cam-card">
-                        <div class="cam-card-title">🎥 Camera Traseira - Em Tempo Real</div>
+                        <div class="cam-card-title">🎥 Camera Traseira</div>
                         <div class="cam-frame">
                             <span id="labelBack" class="cam-placeholder">Sem Sinal</span>
                             <img id="imgBack" src="" alt="Traseira">
@@ -139,10 +147,34 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
             <script>
                 let lastValidLat = {{ info_moto.lat }};
                 let lastValidLon = {{ info_moto.lon }};
+                let mapaEscuro = true;
+                let map, marker, layerEscuro, layerClaro;
                 
-                const map = L.map('map_private', { zoomControl: false }).setView([lastValidLat, lastValidLon], 16);
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
-                let marker = L.marker([lastValidLat, lastValidLon]).addTo(map);
+                // Camadas do mapa
+                layerEscuro = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {});
+                layerClaro = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {});
+                
+                map = L.map('map_private', { zoomControl: true }).setView([lastValidLat, lastValidLon], 16);
+                layerEscuro.addTo(map);
+                marker = L.marker([lastValidLat, lastValidLon]).addTo(map);
+                
+                // Função para alternar tema do mapa
+                function alternarTema() {
+                    const btn = document.getElementById('btnTheme');
+                    if (mapaEscuro) {
+                        map.removeLayer(layerEscuro);
+                        layerClaro.addTo(map);
+                        btn.textContent = '🌙 Mapa Escuro';
+                        btn.classList.add('light');
+                        mapaEscuro = false;
+                    } else {
+                        map.removeLayer(layerClaro);
+                        layerEscuro.addTo(map);
+                        btn.textContent = '☀️ Mapa Claro';
+                        btn.classList.remove('light');
+                        mapaEscuro = true;
+                    }
+                }
 
                 async function dispararCapturaDupla() {
                     const btn = document.getElementById('btnCam');
@@ -165,16 +197,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                     
                                     if(data.photo_back) {
                                         document.getElementById('labelBack').style.display = "none";
-                                        const imgB = document.getElementById('imgBack');
-                                        imgB.src = "data:image/jpeg;base64," + data.photo_back;
-                                        imgB.style.display = "block";
+                                        document.getElementById('imgBack').src = "data:image/jpeg;base64," + data.photo_back;
+                                        document.getElementById('imgBack').style.display = "block";
                                     }
                                     
                                     if(data.photo_front) {
                                         document.getElementById('labelFront').style.display = "none";
-                                        const imgF = document.getElementById('imgFront');
-                                        imgF.src = "data:image/jpeg;base64," + data.photo_front;
-                                        imgF.style.display = "block";
+                                        document.getElementById('imgFront').src = "data:image/jpeg;base64," + data.photo_front;
+                                        document.getElementById('imgFront').style.display = "block";
                                     }
                                     
                                     if(data.pronto) {
@@ -185,24 +215,24 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                 }
                                 
                                 tentativas++;
-                                if(tentativas > 20) {
+                                if(tentativas > 30) { // 45 segundos de timeout
                                     clearInterval(checagem);
                                     btn.innerText = "📸 Iniciar Captura Sincronizada";
                                     btn.disabled = false;
-                                    alert("Timeout: As fotos nao chegaram. Verifique o dispositivo.");
+                                    alert("Timeout: Verifique o dispositivo.");
                                 }
                             } catch(e){
-                                console.error("Erro na checagem:", e);
+                                console.error("Erro:", e);
                             }
                         }, 1500);
                         
                     } catch(e) {
-                        console.error("Erro ao disparar captura:", e);
                         btn.innerText = "📸 Iniciar Captura Sincronizada";
                         btn.disabled = false;
                     }
                 }
 
+                // Atualização RÁPIDA a cada 2 segundos
                 setInterval(async () => {
                     try {
                         const response = await fetch('/api/status/' + '{{ id_buscado }}');
@@ -225,21 +255,21 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             else if (temp > 35) tempElement.style.color = '#f59e0b';
                             else tempElement.style.color = '#22c55e';
                             
+                            // ATUALIZA LOCALIZAÇÃO IMEDIATAMENTE
                             let nextLat = parseFloat(data.lat);
                             let nextLon = parseFloat(data.lon);
                             if (nextLat && nextLon) {
                                 lastValidLat = nextLat;
                                 lastValidLon = nextLon;
-                                const newPos = [lastValidLat, lastValidLon];
-                                marker.setLatLng(newPos);
-                                map.panTo(newPos);
+                                marker.setLatLng([lastValidLat, lastValidLon]);
+                                map.panTo([lastValidLat, lastValidLon], {animate: true, duration: 0.5});
                                 document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lastValidLat + ',' + lastValidLon;
                             }
                         }
                     } catch (e) {
-                        console.error("Erro ao atualizar status:", e);
+                        console.error("Erro ao atualizar:", e);
                     }
-                }, 5000);
+                }, 2000); // 2 segundos!
             </script>
         {% endif %}
     </div>
@@ -294,30 +324,31 @@ def update():
     device_id = data.get('device_id', '').upper()
     
     if not device_id: 
-        return jsonify({"status": "error", "message": "device_id required"}), 400
+        return jsonify({"status": "error"}), 400
     
     if device_id not in db_dispositivos: 
         db_dispositivos[device_id] = {}
-        logger.info(f"Novo dispositivo registrado: {device_id}")
+        logger.info(f"Novo dispositivo: {device_id}")
     
-    db_dispositivos[device_id]["battery"] = data.get("battery", "N/A")
-    db_dispositivos[device_id]["battery_status"] = data.get("battery_status", "N/A")
-    db_dispositivos[device_id]["battery_temp"] = data.get("battery_temp", "N/A")
-    db_dispositivos[device_id]["storage"] = data.get("storage", "N/A")
-    db_dispositivos[device_id]["uptime"] = data.get("uptime", "N/A")
-    db_dispositivos[device_id]["lat"] = float(data.get("lat", -16.6869))
-    db_dispositivos[device_id]["lon"] = float(data.get("lon", -49.2648))
-    db_dispositivos[device_id]["speed"] = data.get("speed", "0 km/h")
-    db_dispositivos[device_id]["temperature"] = data.get("temperature", "N/A")
-    db_dispositivos[device_id]["network"] = data.get("network", "N/A")
-    db_dispositivos[device_id]["ram"] = data.get("ram", "N/A")
-    db_dispositivos[device_id]["timestamp"] = data.get("timestamp", "")
-    db_dispositivos[device_id]["last_seen"] = datetime.utcnow().isoformat()
+    db_dispositivos[device_id].update({
+        "battery": data.get("battery", "N/A"),
+        "battery_status": data.get("battery_status", "N/A"),
+        "battery_temp": data.get("battery_temp", "N/A"),
+        "storage": data.get("storage", "N/A"),
+        "uptime": data.get("uptime", "N/A"),
+        "lat": float(data.get("lat", -16.6869)),
+        "lon": float(data.get("lon", -49.2648)),
+        "speed": data.get("speed", "0 km/h"),
+        "temperature": data.get("temperature", "N/A"),
+        "network": data.get("network", "N/A"),
+        "ram": data.get("ram", "N/A"),
+        "timestamp": data.get("timestamp", ""),
+        "last_seen": datetime.utcnow().isoformat()
+    })
     
     cmd_cam = db_dispositivos[device_id].get("cmd_cam", "wait")
     db_dispositivos[device_id]["cmd_cam"] = "wait"
     
-    logger.info(f"Update recebido de {device_id} - Bat:{data.get('battery')}% - Vel:{data.get('speed')}")
     return jsonify({"status": "success", "comando_cam": cmd_cam}), 200
 
 @app.route('/api/comando_camera/<device_id>', methods=['POST'])
@@ -328,13 +359,35 @@ def comando_camera(device_id):
     if device_id not in db_dispositivos: 
         db_dispositivos[device_id] = {}
     
-    acao = data.get("acao", "wait")
-    db_dispositivos[device_id]["cmd_cam"] = acao
+    db_dispositivos[device_id]["cmd_cam"] = data.get("acao", "wait")
     db_dispositivos[device_id]["photo_front"] = ""
     db_dispositivos[device_id]["photo_back"] = ""
     
-    logger.info(f"Comando de camera enviado para {device_id}: {acao}")
-    return jsonify({"status": "ok", "comando": acao}), 200
+    return jsonify({"status": "ok"}), 200
+
+@app.route('/api/upload_lote', methods=['POST'])
+def upload_lote():
+    """Recebe as duas fotos em um único pacote"""
+    data = request.get_json(force=True, silent=True) or {}
+    dev_id = data.get("device_id", '').upper()
+    foto_front = data.get("photo_front", "")
+    foto_back = data.get("photo_back", "")
+    
+    logger.info(f"LOTE recebido de {dev_id} - Front: {len(foto_front)} chars, Back: {len(foto_back)} chars")
+    
+    if dev_id and dev_id in db_dispositivos:
+        if foto_front:
+            db_dispositivos[dev_id]["photo_front"] = foto_front
+        if foto_back:
+            db_dispositivos[dev_id]["photo_back"] = foto_back
+        
+        return jsonify({
+            "status": "stored",
+            "front_received": bool(foto_front),
+            "back_received": bool(foto_back)
+        }), 200
+    
+    return jsonify({"status": "error"}), 404
 
 @app.route('/api/upload_camera', methods=['POST'])
 def upload_camera():
@@ -343,19 +396,11 @@ def upload_camera():
     tipo = data.get("tipo")
     foto = data.get("photo", "")
     
-    logger.info(f"Recebendo foto {tipo} de {dev_id} - Tamanho: {len(foto)} chars")
+    if dev_id and dev_id in db_dispositivos and foto:
+        db_dispositivos[dev_id][f"photo_{tipo}"] = foto
+        return jsonify({"status": "stored"}), 200
     
-    if dev_id and dev_id in db_dispositivos:
-        if foto:
-            db_dispositivos[dev_id][f"photo_{tipo}"] = foto
-            logger.info(f"Foto {tipo} armazenada para {dev_id}")
-            return jsonify({"status": "stored"}), 200
-        else:
-            logger.warning(f"Foto {tipo} vazia recebida de {dev_id}")
-            return jsonify({"status": "error", "message": "Empty photo"}), 400
-    else:
-        logger.warning(f"Tentativa de upload para dispositivo inexistente: {dev_id}")
-        return jsonify({"status": "error", "message": "Device not found"}), 404
+    return jsonify({"status": "error"}), 400
 
 @app.route('/api/get_camera/<device_id>')
 def get_camera(device_id):
@@ -363,43 +408,11 @@ def get_camera(device_id):
     if device_id in db_dispositivos:
         pf = db_dispositivos[device_id].get("photo_front", "")
         pb = db_dispositivos[device_id].get("photo_back", "")
-        pronto = True if (pf and pb) else False
-        
-        logger.info(f"Status fotos {device_id} - Front: {bool(pf)}, Back: {bool(pb)}, Pronto: {pronto}")
+        pronto = bool(pf and pb)
         return jsonify({"photo_front": pf, "photo_back": pb, "pronto": pronto}), 200
     
     return jsonify({"photo_front": "", "photo_back": "", "pronto": False}), 404
 
-
-@app.route('/api/upload_lote', methods=['POST'])
-def upload_lote():
-    """Recebe as duas fotos em um unico pacote"""
-    data = request.get_json(force=True, silent=True) or {}
-    dev_id = data.get("device_id", '').upper()
-    foto_front = data.get("photo_front", "")
-    foto_back = data.get("photo_back", "")
-    
-    logger.info(f"Recebendo LOTE de fotos de {dev_id}")
-    logger.info(f"   Frontal: {len(foto_front)} chars | Traseira: {len(foto_back)} chars")
-    
-    if dev_id and dev_id in db_dispositivos:
-        if foto_front:
-            db_dispositivos[dev_id]["photo_front"] = foto_front
-            logger.info(f"   ✅ Frontal armazenada")
-        if foto_back:
-            db_dispositivos[dev_id]["photo_back"] = foto_back
-            logger.info(f"   ✅ Traseira armazenada")
-        
-        return jsonify({
-            "status": "stored",
-            "front_received": bool(foto_front),
-            "back_received": bool(foto_back)
-        }), 200
-    else:
-        logger.warning(f"Dispositivo nao encontrado para lote: {dev_id}")
-        return jsonify({"status": "error", "message": "Device not found"}), 404
-
 if __name__ == '__main__':
-
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
