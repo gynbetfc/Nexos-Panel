@@ -78,7 +78,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 
             <script>
                 let lastValidLat = {{ info_moto.lat }};
-                let lastValidLon = {{ info_moto.lon };
+                let lastValidLon = {{ info_moto.lon }};
                 
                 const map = L.map('map_private', { zoomControl: false }).setView([lastValidLat, lastValidLon], 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
@@ -89,10 +89,8 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     btn.innerText = "⏳ Capturando...";
                     btn.disabled = true;
                     
-                    // Envia ordem para o banco de dados do servidor
                     await fetch('/api/comando_camera/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'take'}), headers: {'Content-Type': 'application/json'} });
                     
-                    // Começa a monitorar se a foto chegou a cada 2 segundos
                     let checagem = setInterval(async () => {
                         try {
                             const res = await fetch('/api/get_camera/{{ id_buscado }}');
@@ -178,9 +176,8 @@ def update():
     db_dispositivos[device_id]["lat"] = float(data.get("lat", -16.6869))
     db_dispositivos[device_id]["lon"] = float(data.get("lon", -49.2648))
     
-    # Responde com o comando da câmera pendente
     cmd_cam = db_dispositivos[device_id].get("cmd_cam", "wait")
-    db_dispositivos[device_id]["cmd_cam"] = "wait" # Consome o comando
+    db_dispositivos[device_id]["cmd_cam"] = "wait"
     return jsonify({"status": "success", "comando_cam": cmd_cam}), 200
 
 @app.route('/api/comando_camera/<device_id>', methods=['POST'])
@@ -203,7 +200,7 @@ def upload_camera():
 def get_camera(device_id):
     if device_id in db_dispositivos:
         photo = db_dispositivos[device_id].get("photo_b64", "")
-        db_dispositivos[device_id]["photo_b64"] = "" # Limpa após baixar
+        db_dispositivos[device_id]["photo_b64"] = ""
         return jsonify({"photo": photo}), 200
     return jsonify({"photo": ""}), 404
 
