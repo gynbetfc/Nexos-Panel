@@ -116,7 +116,7 @@ def index():
     if request.method == 'POST':
         id_buscado = request.form.get('target_id', '').strip()
         if id_buscado in db_dispositivos:
-            info_moto = db_dispositivos[id_bus传统 ] = db_dispositivos[id_buscado]
+            info_moto = db_dispositivos[id_buscado]
         else:
             erro = "ID NAO ENCONTRADO"
     return render_template_string(HTML_DASHBOARD_PRIVADO, id_buscado=id_buscado, info_moto=info_moto, erro=erro)
