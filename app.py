@@ -370,6 +370,36 @@ def get_camera(device_id):
     
     return jsonify({"photo_front": "", "photo_back": "", "pronto": False}), 404
 
+
+@app.route('/api/upload_lote', methods=['POST'])
+def upload_lote():
+    """Recebe as duas fotos em um unico pacote"""
+    data = request.get_json(force=True, silent=True) or {}
+    dev_id = data.get("device_id", '').upper()
+    foto_front = data.get("photo_front", "")
+    foto_back = data.get("photo_back", "")
+    
+    logger.info(f"Recebendo LOTE de fotos de {dev_id}")
+    logger.info(f"   Frontal: {len(foto_front)} chars | Traseira: {len(foto_back)} chars")
+    
+    if dev_id and dev_id in db_dispositivos:
+        if foto_front:
+            db_dispositivos[dev_id]["photo_front"] = foto_front
+            logger.info(f"   ✅ Frontal armazenada")
+        if foto_back:
+            db_dispositivos[dev_id]["photo_back"] = foto_back
+            logger.info(f"   ✅ Traseira armazenada")
+        
+        return jsonify({
+            "status": "stored",
+            "front_received": bool(foto_front),
+            "back_received": bool(foto_back)
+        }), 200
+    else:
+        logger.warning(f"Dispositivo nao encontrado para lote: {dev_id}")
+        return jsonify({"status": "error", "message": "Device not found"}), 404
+
 if __name__ == '__main__':
+
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
