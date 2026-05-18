@@ -25,7 +25,7 @@ def obter_ou_criar_id_unico():
 DEVICE_ID = obter_ou_criar_id_unico()
 
 print("\n" + "="*45)
-print(f"🛰️  MOTOR NEXOS CAMERA SYSTEM OPERACIONAL")
+print(f"🛰️  MOTOR NEXOS LIGHT-CAM DUAL SYSTEM OPERACIONAL")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*45 + "\n")
 
@@ -34,14 +34,14 @@ ultima_lon_valida = -49.2648
 headers_json = {"Content-Type": "application/json"}
 
 while True:
-    # 1. Coleta dados de Bateria
+    # 1. Bateria
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
         try: battery = str(json.loads(out_bat).get("percentage", "N/A"))
         except: pass
         
-    # 2. Coleta dados de Armazenamento
+    # 2. Armazenamento
     storage = "N/A"
     out_df = run_command("df -h /data/data/com.termux/files/home")
     if out_df:
@@ -52,7 +52,7 @@ while True:
                 if len(parts) >= 3: storage = f"{parts[3]} livres"
         except: pass
 
-    # 3. Coleta Localização GPS
+    # 3. GPS
     lat, lon = ultima_lat_valida, ultima_lon_valida
     out_loc = run_command("termux-location -p gps -r once")
     if out_loc:
@@ -65,7 +65,7 @@ while True:
                 ultima_lon_valida = lon
         except: pass
 
-    # 4. Envia Sincronismo e Checa se o Botão foi Clicado
+    # 4. Sincronismo e Leitura de ordens de Lente
     payload = {
         "device_id": DEVICE_ID,
         "battery": battery,
@@ -80,33 +80,31 @@ while True:
         if response.status_code == 200:
             res_data = response.json()
             comando_cam = res_data.get("comando_cam", "wait")
-            print(f"🛰️ [OK] GPS Ativo. Status Câmera: {comando_cam.upper()}")
+            id_lente = res_data.get("target_id_cam", "0") 
             
-            # SE O COMPATÍVEL MANDOU "TAKE", BATE A FOTO DE SEGUNDO PLANO
+            print(f"🛰️ [OK] Sincronizado. Lente em espera: {id_lente}")
+            
             if comando_cam == "take":
-                print("📸 [AÇÃO] Comando recebido! Batendo foto oculta...")
+                camera_nome = "TRASEIRA" if id_lente == "0" else "FRONTAL"
+                print(f"📸 [AÇÃO] Disparando lente {camera_nome} em modo compacto...")
                 
-                # Deleta resquício antigo
                 if os.path.exists(ARQUIVO_FOTO): os.remove(ARQUIVO_FOTO)
                 
-                # Executa a foto da câmera traseira (ID 0)
-                # Nota: Use -c 1 se quiser testar a câmera frontal
-                run_command(f"termux-camera-photo -c 0 {ARQUIVO_FOTO}")
-                time.sleep(2.0) # Espera a lente abrir e processar
+                # NOVIDADE: Força a captura em 640x480. A foto fica super leve, foca rápido e não dá timeout!
+                run_command(f"termux-camera-photo -c {id_lente} --size 640x480 {ARQUIVO_FOTO}")
+                time.sleep(2.0)
                 
                 if os.path.exists(ARQUIVO_FOTO) and os.path.getsize(ARQUIVO_FOTO) > 0:
                     with open(ARQUIVO_FOTO, "rb") as img_file:
                         photo_b64 = base64.b64encode(img_file.read()).decode('utf-8')
                     
-                    # Faz o upload da imagem para o painel web
                     payload_img = {"device_id": DEVICE_ID, "photo": photo_b64}
-                    requests.post(URL_UPLOAD_CAM, data=json.dumps(payload_img), headers=headers_json, timeout=10)
-                    print("🚀 [OK] Imagem capturada e enviada com sucesso!")
-                    
-                    # Apaga do celular para segurança e privacidade
+                    # Aumentamos o timeout de escrita para 15 segundos por segurança extra
+                    requests.post(URL_UPLOAD_CAM, data=json.dumps(payload_img), headers=headers_json, timeout=15)
+                    print("🚀 [OK] Foto leve transmitida com sucesso!")
                     os.remove(ARQUIVO_FOTO)
                     
     except Exception as e:
-        print(f"⚠️ Alerta de sincronismo: {e}")
+        print(f"⚠️ Alerta de envio: {e}")
 
     time.sleep(2.0)
