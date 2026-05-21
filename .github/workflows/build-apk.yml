@@ -9,25 +9,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
+      
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y autoconf libtool libffi-dev
           pip install buildozer cython
-
+      
+      - name: Accept Android licenses
+        run: |
+          mkdir -p $HOME/.android
+          echo "## Commercial License" > $HOME/.android/repositories.cfg
+          yes | $HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+      
       - name: Create project
         run: |
           mkdir -p apk-build/agent
           cp device_agent.py apk-build/agent/main.py
           cd apk-build
           buildozer init
-
+      
       - name: Configure buildozer
         run: |
           cat > apk-build/buildozer.spec << 'SPECEOF'
@@ -48,17 +54,18 @@ jobs:
           android.archs = arm64-v8a
           android.allow_backup = True
           android.presplash_color = #000000
+          android.accept_sdk_license = True
           p4a.branch = develop
           [buildozer]
           log_level = 2
           warn_on_root = 1
           SPECEOF
-
+      
       - name: Build APK
         run: |
           cd apk-build
           buildozer android debug
-
+      
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
