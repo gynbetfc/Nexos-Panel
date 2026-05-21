@@ -1,7 +1,5 @@
 name: Build NEXOS APK
 on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -10,22 +8,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Setup Python 3.11
+      - name: Setup Python 3.10
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.10'
       
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y autoconf libtool libffi-dev
-          pip install buildozer cython
-      
-      - name: Accept Android licenses
-        run: |
-          mkdir -p $HOME/.android
-          echo "## Commercial License" > $HOME/.android/repositories.cfg
-          yes | $HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+          sudo apt-get install -y autoconf libtool libffi-dev libltdl-dev
+          pip install buildozer==1.5.0 cython
       
       - name: Create project
         run: |
@@ -48,14 +40,14 @@ jobs:
           orientation = portrait
           fullscreen = 1
           android.permissions = INTERNET,ACCESS_FINE_LOCATION,ACCESS_COARSE_LOCATION,CAMERA
-          android.api = 33
-          android.minapi = 26
-          android.ndk = 25b
+          android.api = 30
+          android.minapi = 21
+          android.ndk = 23c
           android.archs = arm64-v8a
           android.allow_backup = True
           android.presplash_color = #000000
           android.accept_sdk_license = True
-          p4a.branch = develop
+          p4a.branch = master
           [buildozer]
           log_level = 2
           warn_on_root = 1
